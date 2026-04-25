@@ -1,6 +1,10 @@
 package com.kkalchake.enlightenment.config;
+
+import com.kkalchake.enlightenment.filter.JwtFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -9,6 +13,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -17,7 +22,10 @@ import java.util.List;
 
     @Configuration
     @EnableWebSecurity
+    @RequiredArgsConstructor
     public class SecurityConfig {
+
+        private final JwtFilter jwtFilter;
 
         @Bean
         public PasswordEncoder passwordEncoder() {
@@ -27,19 +35,16 @@ import java.util.List;
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             http
-                    // 1. Enable CORS for React
                     .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                    // 2. Disable CSRF for stateless REST APIs
                     .csrf(AbstractHttpConfigurer::disable)
-                    // 3. Ensure API is stateless (no server-side sessions)
                     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                    // 4. Configure Authorization Rules
+                    .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                     .authorizeHttpRequests(auth -> auth
-                            .requestMatchers("/api/auth/**").permitAll() // Open registration/login
-                            .requestMatchers("/h2-console/**").permitAll() // Allow H2 DB access for dev
+                            .requestMatchers("/api/auth/**").permitAll()
+                            .requestMatchers("/h2-console/**").permitAll()
+                            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                             .anyRequest().authenticated()
                     )
-                    // 5. Required to allow H2 Console to render in browser frames
                     .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
 
             return http.build();
