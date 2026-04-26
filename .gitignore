@@ -32,3 +32,6 @@ build/
 !**/src/test/**/build/
 AhaSpaceUI
 src/main/resources/application-dev.yaml
+.env
+context/
+src/main/resources/application-local.properties.example
