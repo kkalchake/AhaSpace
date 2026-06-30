@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
@@ -17,25 +17,25 @@ import java.util.Map;
 @Component("geminiProvider")
 public class GeminiProvider implements AiProvider {
 
-    private final WebClient webClient;
+    private final RestClient restClient;
     private final String apiKey;
     private final String model;
     private final ObjectMapper objectMapper;
 
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-
+    // https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent
     @Autowired
     public GeminiProvider(
-            WebClient.Builder webClientBuilder,
+            RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
             @Value("${gemini.api.key:}") String apiKey,
-            @Value("${gemini.model:gemini-2.0-flash}") String model) {
-        this(webClientBuilder, objectMapper, apiKey, model, GEMINI_BASE_URL);
+            @Value("${gemini.model:gemini-2.5-flash-lite}") String model) {
+        this(restClientBuilder, objectMapper, apiKey, model, GEMINI_BASE_URL);
     }
 
     // Package-private constructor for testing
     GeminiProvider(
-            WebClient.Builder webClientBuilder,
+            RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
             String apiKey,
             String model,
@@ -43,7 +43,7 @@ public class GeminiProvider implements AiProvider {
         this.apiKey = apiKey;
         this.model = model;
         this.objectMapper = objectMapper;
-        this.webClient = webClientBuilder
+        this.restClient = restClientBuilder
                 .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
@@ -63,12 +63,12 @@ public class GeminiProvider implements AiProvider {
         );
 
         try {
-            String response = webClient.post()
+            String response = restClient.post()
                     .uri("/v1beta/models/{model}:generateContent?key={apiKey}", model, apiKey)
-                    .bodyValue(requestBody)
+                    // https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent
+                    .body(requestBody)
                     .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+                    .body(String.class);
 
             return extractTextFromResponse(response);
         } catch (Exception e) {
