@@ -1,38 +1,36 @@
 package com.kkalchake.enlightenment.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class GeminiProviderTest {
 
-    private MockWebServer mockWebServer;
+    private static final String BASE_URL = "http://test-host";
+
+    private MockRestServiceServer server;
     private GeminiProvider geminiProvider;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        mockWebServer = new MockWebServer();
         objectMapper = new ObjectMapper();
-        String baseUrl = mockWebServer.url("/").toString();
-        WebClient.Builder webClientBuilder = WebClient.builder();
-        geminiProvider = new GeminiProvider(webClientBuilder, objectMapper, "test-api-key", "gemini-test", baseUrl);
-    }
-
-    @AfterEach
-    void tearDown() throws Exception {
-        mockWebServer.shutdown();
+        RestClient.Builder builder = RestClient.builder();
+        server = MockRestServiceServer.bindTo(builder).build();
+        geminiProvider = new GeminiProvider(builder, objectMapper, "test-api-key", "gemini-test", BASE_URL);
     }
 
     @Test
-    void chat_success() throws Exception {
+    void chat_success() {
         String jsonResponse = """
                 {
                     "candidates": [
@@ -47,25 +45,20 @@ class GeminiProviderTest {
                 }
                 """;
 
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setBody(jsonResponse)
-                .addHeader("Content-Type", "application/json"));
+        server.expect(requestTo(containsString("test-api-key")))
+                .andExpect(requestTo(containsString("gemini-test")))
+                .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
         String result = geminiProvider.chat("Hello");
 
         assertEquals("Hello from Gemini!", result);
-
-        RecordedRequest request = mockWebServer.takeRequest();
-        assertTrue(request.getPath().contains("test-api-key"));
-        assertTrue(request.getPath().contains("gemini-test"));
+        server.verify();
     }
 
     @Test
     void chat_emptyApiKey_throwsException() {
-        String baseUrl = mockWebServer.url("/").toString();
-        WebClient.Builder webClientBuilder = WebClient.builder();
-        GeminiProvider providerWithEmptyKey = new GeminiProvider(webClientBuilder, objectMapper, "", "gemini-test", baseUrl);
+        RestClient.Builder builder = RestClient.builder();
+        GeminiProvider providerWithEmptyKey = new GeminiProvider(builder, objectMapper, "", "gemini-test", BASE_URL);
 
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 () -> providerWithEmptyKey.chat("Hello"));
@@ -74,9 +67,8 @@ class GeminiProviderTest {
 
     @Test
     void chat_nullApiKey_throwsException() {
-        String baseUrl = mockWebServer.url("/").toString();
-        WebClient.Builder webClientBuilder = WebClient.builder();
-        GeminiProvider providerWithNullKey = new GeminiProvider(webClientBuilder, objectMapper, null, "gemini-test", baseUrl);
+        RestClient.Builder builder = RestClient.builder();
+        GeminiProvider providerWithNullKey = new GeminiProvider(builder, objectMapper, null, "gemini-test", BASE_URL);
 
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 () -> providerWithNullKey.chat("Hello"));
@@ -85,13 +77,13 @@ class GeminiProviderTest {
 
     @Test
     void chat_apiError_throwsException() {
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(500)
-                .setBody("Internal Server Error"));
+        server.expect(requestTo(containsString("/v1beta/models/")))
+                .andRespond(withServerError());
 
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> geminiProvider.chat("Hello"));
         assertTrue(exception.getMessage().contains("Failed to get response"));
+        server.verify();
     }
 
     @Test
@@ -102,14 +94,13 @@ class GeminiProviderTest {
                 }
                 """;
 
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setBody(jsonResponse)
-                .addHeader("Content-Type", "application/json"));
+        server.expect(requestTo(containsString("/v1beta/models/")))
+                .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
         String result = geminiProvider.chat("Hello");
 
         assertEquals("No response generated", result);
+        server.verify();
     }
 
     @Test
@@ -124,14 +115,13 @@ class GeminiProviderTest {
                 }
                 """;
 
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setBody(jsonResponse)
-                .addHeader("Content-Type", "application/json"));
+        server.expect(requestTo(containsString("/v1beta/models/")))
+                .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
         String result = geminiProvider.chat("Hello");
 
         assertEquals("No response generated", result);
+        server.verify();
     }
 
     @Test
