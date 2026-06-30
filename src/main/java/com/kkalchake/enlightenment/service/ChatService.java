@@ -1,22 +1,96 @@
 package com.kkalchake.enlightenment.service;
 
-import com.kkalchake.enlightenment.dto.ChatResponse;
+import com.kkalchake.enlightenment.dto.*;
+import com.kkalchake.enlightenment.model.*;
+import com.kkalchake.enlightenment.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
+    // @Qualifier on the field is copied to the constructor parameter by Lombok, resolving the correct AiProvider bean
     @Qualifier("geminiProvider")
     private final AiProvider aiProvider;
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final UserRepository userRepository;
 
-    public ChatResponse processMessage(String message) {
-        log.info("Processing chat message");
+    @Transactional
+    public ChatResponse processMessage(String message, String username, Long sessionId) {
+        log.info("Processing chat message for user: {}", username);
+        ChatSession session;
+
+        if (sessionId == null) {
+            // No sessionId provided: create a new session for this user
+            var user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
+            session = new ChatSession();
+            session.setUser(user);
+            session.setTitle(buildTitle(message));
+            session = chatSessionRepository.save(session);
+        } else {
+            session = chatSessionRepository.findById(sessionId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+            // Ownership check: prevent users from writing into another user's session
+            if (!session.getUser().getUsername().equals(username)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+            }
+        }
+
+        ChatMessage userMsg = new ChatMessage();
+        userMsg.setSession(session);
+        userMsg.setRole("user");
+        userMsg.setContent(message);
+        chatMessageRepository.save(userMsg);
+
         String aiResponse = aiProvider.chat(message);
-        return new ChatResponse(aiResponse, aiProvider.getModelName());
+        String modelName = aiProvider.getModelName();
+
+        ChatMessage assistantMsg = new ChatMessage();
+        assistantMsg.setSession(session);
+        assistantMsg.setRole("assistant");
+        assistantMsg.setContent(aiResponse);
+        assistantMsg.setModel(modelName);
+        chatMessageRepository.save(assistantMsg);
+
+        return new ChatResponse(aiResponse, modelName, session.getId(), session.getTitle());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatSessionSummaryDto> getSessions(String username) {
+        return chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc(username)
+                .stream()
+                .map(s -> new ChatSessionSummaryDto(s.getId(), s.getTitle(), s.getCreatedAt()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ChatSessionDetailDto getSession(Long sessionId, String username) {
+        ChatSession session = chatSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+        if (!session.getUser().getUsername().equals(username)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+        List<ChatMessageDto> messageDtos = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
+                .stream()
+                .map(m -> new ChatMessageDto(m.getId(), m.getRole(), m.getContent(), m.getModel(), m.getCreatedAt()))
+                .collect(Collectors.toList());
+        return new ChatSessionDetailDto(session.getId(), session.getTitle(), session.getCreatedAt(), messageDtos);
+    }
+
+    // Truncate to 50 chars so the sidebar title stays readable
+    private String buildTitle(String message) {
+        return message.length() > 50 ? message.substring(0, 50) + "..." : message;
     }
 }
