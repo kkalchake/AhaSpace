@@ -19,14 +19,14 @@ public class UserRepositoryTestRunner implements CommandLineRunner {
     public void run(String... args) throws Exception {
         System.out.println("--- Bootstrapping Data ---");
 
-        // 1. Create a User using Lombok or manual constructor
-        User testUser = new User();
-        testUser.setUsername("test_engineer");
-        testUser.setPasswordHash("hashed_password_123");
+        // Guard against duplicate on restart: with a persistent DB the user already exists
+        if (userRepository.findByUsername("test_engineer").isEmpty()) {
+            User testUser = new User();
+            testUser.setUsername("test_engineer");
+            testUser.setPasswordHash("hashed_password_123");
+            userRepository.save(testUser);
+        }
 
-        // 2. Use the Repository to save it
-        userRepository.save(testUser);
-
-        System.out.println("User saved! Count in DB: " + userRepository.count());
+        System.out.println("User count in DB: " + userRepository.count());
     }
 }
