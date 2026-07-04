@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 9 — Local Validation</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+
+  .env-card { margin-top: 12px; font-size: 13.5px; }
+  .env-card .row { display: flex; gap: 10px; margin: 4px 0; }
+  .env-card .k { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); width: 90px; flex: none; padding-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 9 — Course/Section endpoints</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub">Every screenshot below is from an actual run against the live server — not a description of what should happen. Validated twice, against both databases the app supports: the default in-memory H2 profile, and the real Postgres <code>dev</code> profile. Under each screenshot, expand <strong>Recreate this step</strong> for the exact commands to reproduce it yourself.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>H2</th><th>Postgres</th></tr>
+    <tr><td class="num">01</td><td>Schema created on startup</td><td>courses, sections, user_courses tables exist</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02–03</td><td>Insert Course + 2 Sections</td><td>Rows persist, FK to course_id set</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">04–05</td><td>Select back the rows</td><td>Data matches what was inserted</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06</td><td>Schema detail check</td><td>H2: join table empty · Postgres: real column types</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">07</td><td>Register a user</td><td>201 Created</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08</td><td>Login</td><td>200, JWT returned</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">09</td><td>GET /api/courses, no auth</td><td>403 (not 401 — confirmed app behavior)</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">10</td><td>GET /api/courses, authenticated</td><td>200, only id/title/description</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">11</td><td>GET /api/courses/1/sections</td><td>200, only id/content/courseId</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">12</td><td>GET /api/courses/999/sections</td><td>404, {"error":"Course not found"}</td><td><span class="pill pass">PASS</span></td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== H2 GROUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Environment 1 — default profile (in-memory H2)</summary>
+<p class="group-intro">No Docker, no environment variables. This is the fastest way to validate the endpoint logic itself.</p>
+
+<details class="recreate setup">
+  <summary>Set up this environment</summary>
+  <div class="body">
+    <ol>
+      <li>From the repo root: <pre>cd AhaSpace
+mvn spring-boot:run</pre></li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code> in the console output.</li>
+      <li>That's it — the default <code>application.yaml</code> profile points at <code>jdbc:h2:mem:learning_db</code>, an in-memory database Hibernate creates fresh on every restart.</li>
+    </ol>
+  </div>
+</details>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>Schema created on startup</h2></div>
+  <p class="step-note">Connected to the running app's H2 console. The left tree shows <strong>COURSES</strong>, <strong>SECTIONS</strong>, and <strong>USER_COURSES</strong> alongside the existing <code>CHAT_MESSAGES</code>/<code>CHAT_SESSIONS</code>/<code>USERS</code> tables — Hibernate's <code>ddl-auto=update</code> generated all three new tables from the entity annotations with no manual migration.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-schema-tree.png" alt="H2 console schema tree showing COURSES, SECTIONS, USER_COURSES tables"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>With the server running (see setup above), open <code>http://localhost:8080/h2-console</code> in a browser.</li>
+        <li>Leave <strong>Driver Class</strong> as <code>org.h2.Driver</code> and <strong>JDBC URL</strong> as <code>jdbc:h2:mem:learning_db</code> — both are pre-filled.</li>
+        <li>Set <strong>User Name</strong> to <code>sa</code>, leave <strong>Password</strong> blank.</li>
+        <li>Click <strong>Connect</strong>. The left-hand tree lists every table that exists right now.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Insert a Course</h2></div>
+  <p class="step-note">One row inserted into <code>COURSES</code> directly via SQL (no create-endpoint exists this week by design — read-only APIs only).</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/02-insert-course.png" alt="H2 console after inserting a course row"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <p>In the SQL box (top of the console, after connecting), run:</p>
+      <pre>INSERT INTO courses (title, description) VALUES
+  ('Intro to Algebra', 'Basics of algebra: variables, expressions, and equations.');</pre>
+      <p>Click <strong>Run</strong>.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Insert two Sections</h2></div>
+  <p class="step-note">Both rows reference <code>course_id = 1</code> — this is the <code>Section.course</code> owning side of the relationship at work: each section stores the FK back to its course.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/03-insert-sections.png" alt="H2 console after inserting two section rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <p>Replace the SQL box contents with (both statements, then Run once):</p>
+      <pre>INSERT INTO sections (content, course_id) VALUES
+  ('# Lesson 1: Variables', 1);
+INSERT INTO sections (content, course_id) VALUES
+  ('# Lesson 2: Solving Equations', 1);</pre>
+      <p>The <code>1</code> must match whatever id your Course from step 02 actually got — check the tree or re-run <code>SELECT * FROM courses;</code> if unsure.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Verify COURSES content</h2></div>
+  <p class="step-note"><code>SELECT * FROM COURSES;</code> — confirms the row saved with the exact title/description text.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/04-select-courses.png" alt="H2 console SELECT * FROM COURSES result"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM courses;</pre><p>Click <strong>Run</strong>. You should see the row from step 02.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Verify SECTIONS content</h2></div>
+  <p class="step-note"><code>SELECT * FROM SECTIONS;</code> — both rows show <code>course_id = 1</code>, confirming the foreign key column is exactly what <code>@JoinColumn(name = "course_id")</code> specified in the plan.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/05-select-sections.png" alt="H2 console SELECT * FROM SECTIONS result"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM sections;</pre><p>Click <strong>Run</strong>. Confirm both rows show the same <code>course_id</code>.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Verify the User↔Course join table</h2></div>
+  <p class="step-note"><code>SELECT * FROM USER_COURSES;</code> — table exists with the two FK columns from the decisions.md-approved shape, currently empty since no enrollment flow exists yet (out of scope this week).</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/06-select-user-courses-empty.png" alt="H2 console SELECT * FROM USER_COURSES result, empty"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM user_courses;</pre><p>Click <strong>Run</strong>. Expect <code>0 rows</code> — this table only fills once an enrollment feature writes to <code>user.getEnrolledCourses()</code>, which doesn't exist yet.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Register a test user</h2></div>
+  <p class="step-note"><code>POST /api/auth/register</code> — needed to obtain a JWT for the protected endpoints below.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/07-register.png" alt="POST /api/auth/register response, 201 Created"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <p>In a terminal, with the server still running:</p>
+      <pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week9_tester","password":"testpass123"}'</pre>
+      <p>Expect <code>{"message":"User registered successfully"}</code>. Pick a username you haven't used before — registering the same one twice fails.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Log in and capture the JWT</h2></div>
+  <p class="step-note"><code>POST /api/auth/login</code> — the returned <code>token</code> is used as the <code>Authorization: Bearer</code> header for every call below.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/08-login.png" alt="POST /api/auth/login response, 200 with token"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week9_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+echo $TOKEN</pre>
+      <p>Keep this terminal/variable around — steps 10–12 below reuse <code>$TOKEN</code>.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>GET /api/courses — no Authorization header</h2></div>
+  <p class="step-note">Confirms the endpoint is actually behind auth. Returns <strong>403</strong>, not 401 — this app's Spring Security config has no custom <code>AuthenticationEntryPoint</code>, so its default unauthenticated response is 403. Flagged during Phase 6 verification as a deliberate, checked divergence from the plan doc's wording, not a bug.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/09-courses-unauthenticated.png" alt="GET /api/courses without auth, 403 response"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/api/courses</pre><p>No <code>Authorization</code> header — expect <code>403</code>.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>GET /api/courses — authenticated</h2></div>
+  <p class="step-note">Response body has exactly <code>id</code>, <code>title</code>, <code>description</code> — no <code>sections</code> or <code>enrolledUsers</code> field leaking through, confirming <code>CourseDto</code> is doing its job and the LAZY collections are never touched on this path.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/10-courses-authenticated.png" alt="GET /api/courses authenticated, 200 with course list"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>GET /api/courses/1/sections — authenticated</h2></div>
+  <p class="step-note">Both sections returned with exactly <code>id</code>, <code>content</code>, <code>courseId</code> — <code>courseId</code> is the path parameter passed straight through in the service, not read off the lazy <code>Section.course</code> association.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/11-sections-authenticated.png" alt="GET /api/courses/1/sections authenticated, 200 with section list"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/1/sections \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre><p>Use whatever course id you actually created in step 02 if it isn't <code>1</code>.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>GET /api/courses/999/sections — unknown course</h2></div>
+  <p class="step-note">404 with <code>{"error":"Course not found"}</code> — the <code>ResponseStatusException</code> thrown in <code>CourseService</code> propagates through the existing <code>GlobalExceptionHandler</code> exactly as planned, no new exception-handling code needed.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/12-sections-404.png" alt="GET /api/courses/999/sections, 404 course not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/999/sections \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre><p>Use any id you're sure doesn't exist.</p></div>
+  </details>
+</section>
+
+<details class="recreate teardown">
+  <summary>Tear down this environment</summary>
+  <div class="body">
+    <ol>
+      <li>Stop the app: <code>Ctrl+C</code> in the terminal running <code>mvn spring-boot:run</code> (or the Stop button if you launched it from an IDE).</li>
+      <li>That's the entire teardown — H2 here is <code>jdbc:h2:mem:learning_db</code>, an in-memory database that only exists inside this app's own JVM process. The instant the JVM exits, the database (schema, rows, everything from steps 01–06) is gone with it. There's no separate database process to stop, no container, nothing left holding a connection open.</li>
+      <li>Optional housekeeping: close the H2 console browser tab (its connection dies with the app anyway) and clear the shell variable from step 08: <pre>unset TOKEN</pre></li>
+      <li>If <code>Ctrl+C</code> doesn't actually kill the process and a later run fails with "Port 8080 was already in use," see the <strong>Common errors and suggested solutions</strong> section below for how to find and stop the leftover process.</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== POSTGRES GROUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Environment 2 — dev profile (real Postgres)</summary>
+<p class="group-intro">Same 12 checks, run again against the actual Postgres container used for the <code>dev</code> profile — this is what confirms the schema and queries behave identically outside of H2, including real column types.</p>
+
+<details class="recreate setup">
+  <summary>Set up this environment</summary>
+  <div class="body">
+    <ol>
+      <li>Start the Postgres container (config committed at <code>AhaSpace/docker-compose.yml</code> — from the repo root):
+        <pre>docker compose up -d</pre>
+        Safe to run no matter what state the container is already in — missing, stopped, or already running — it won't error or create a duplicate. Do <strong>not</strong> use <code>docker run --name ahaspace-postgres ...</code> here: that command always tries to create a brand-new container, so it fails with a name conflict if one already exists, and fails again with a port conflict if you rename it to dodge that — <code>docker compose up -d</code> exists specifically to avoid both.</li>
+      <li>Confirm it's actually accepting connections before starting the app (it can take a second or two after <code>docker compose up -d</code>):
+        <pre>docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+      <li>Run the app with the <code>dev</code> profile, exporting the three variables it needs in the <em>same</em> command — this is the step that broke earlier when the variables weren't actually reaching the <code>mvn</code> process:
+        <pre>cd AhaSpace
+DB_URL=jdbc:postgresql://localhost:5432/enlightenment \
+DB_USERNAME=ahaspace \
+DB_PASSWORD=ahaspace \
+mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+      </li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. In the startup log you should also see Hibernate's real DDL, e.g. <code>Hibernate: create table courses (id bigserial not null, ...)</code> — if you instead see a driver error mentioning <code>${DB_URL}</code> literally, the export didn't take effect; re-run as one single command exactly as above rather than exporting the variables in a separate line first.</li>
+    </ol>
+  </div>
+</details>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>Schema created on startup (Postgres)</h2></div>
+  <p class="step-note">Same H2 console UI, but pointed at the real database this time — the H2 console is a generic web SQL client, not limited to H2 itself. The tree lists the same tables, now genuinely inside Postgres.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/01-schema-tree-postgres.png" alt="H2 console connected to Postgres, schema tree"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>With the app running against Postgres (see setup above), open <code>http://localhost:8080/h2-console</code>.</li>
+        <li>Set <strong>Driver Class</strong> to <code>org.postgresql.Driver</code>.</li>
+        <li>Set <strong>JDBC URL</strong> to <code>jdbc:postgresql://localhost:5432/enlightenment</code>.</li>
+        <li>Set <strong>User Name</strong> to <code>ahaspace</code>, <strong>Password</strong> to <code>ahaspace</code>.</li>
+        <li>Click <strong>Connect</strong>.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Insert a Course (Postgres)</h2></div>
+  <p class="step-note">Same insert as the H2 run, now a real row in the Postgres <code>enlightenment</code> database.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/02-insert-course.png" alt="Postgres console after inserting a course row"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>INSERT INTO courses (title, description) VALUES
+  ('Intro to Algebra (Postgres)', 'Basics of algebra: variables, expressions, and equations.');</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Insert two Sections (Postgres)</h2></div>
+  <p class="step-note">Same FK relationship, now enforced by a real Postgres foreign key constraint (visible in the startup log as <code>alter table if exists sections add constraint ... foreign key (course_id) references courses</code>).</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/03-insert-sections.png" alt="Postgres console after inserting two section rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>INSERT INTO sections (content, course_id) VALUES ('# Lesson 1: Variables', 1);
+INSERT INTO sections (content, course_id) VALUES ('# Lesson 2: Solving Equations', 1);</pre>
+    <p>Match the id to whatever your course from step 02 actually got.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Verify courses content (Postgres)</h2></div>
+  <p class="step-note">Confirms the row round-tripped correctly through a real database engine, not just H2's in-memory approximation.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/04-select-courses.png" alt="Postgres SELECT * FROM courses result"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM courses;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Verify sections content (Postgres)</h2></div>
+  <p class="step-note">Same check as H2 step 05, against real Postgres rows.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/05-select-sections.png" alt="Postgres SELECT * FROM sections result"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM sections;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Confirm real column types (Postgres)</h2></div>
+  <p class="step-note">This is the check H2 can't give you: querying Postgres's own catalog proves <code>@Column(columnDefinition = "TEXT")</code> actually produced a genuine <code>text</code> column (not a truncated <code>varchar</code>), and that <code>course_id</code> is a real <code>bigint</code> foreign key — exactly the decisions.md-approved shape, confirmed against the production-target database engine.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/06-sections-column-types.png" alt="Postgres information_schema query showing content as text, course_id as bigint"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'sections' ORDER BY ordinal_position;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Register a test user (Postgres)</h2></div>
+  <p class="step-note">Identical API call as H2 step 07 — the point of this whole second pass is that the application code doesn't know or care which database is behind it.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/07-register.png" alt="POST /api/auth/register response against Postgres, 201 Created"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week9_pg_tester","password":"testpass123"}'</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Log in and capture the JWT (Postgres)</h2></div>
+  <p class="step-note">Same flow as before — JWT generation doesn't touch the database differently based on which engine is behind it.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/08-login.png" alt="POST /api/auth/login response against Postgres, 200 with token"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week9_pg_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+echo $TOKEN</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>GET /api/courses — no auth (Postgres)</h2></div>
+  <p class="step-note">Same 403, confirmed independent of which database sits behind the security filter chain.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/09-courses-unauthenticated.png" alt="GET /api/courses without auth against Postgres, 403 response"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/api/courses</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>GET /api/courses — authenticated (Postgres)</h2></div>
+  <p class="step-note">Same clean <code>id</code>/<code>title</code>/<code>description</code> shape, now backed by a real Postgres query instead of H2's.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/10-courses-authenticated.png" alt="GET /api/courses authenticated against Postgres, 200 with course list"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>GET /api/courses/1/sections — authenticated (Postgres)</h2></div>
+  <p class="step-note">Confirms the LAZY-fetch-plus-DTO-inside-transaction pattern works the same way against a real transactional database, not just H2's simplified transaction handling.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/11-sections-authenticated.png" alt="GET /api/courses/1/sections authenticated against Postgres, 200 with section list"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/1/sections \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>GET /api/courses/999/sections — unknown course (Postgres)</h2></div>
+  <p class="step-note">Same 404 shape — the <code>ResponseStatusException</code> → <code>GlobalExceptionHandler</code> path doesn't depend on which database threw the "not found" upstream.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots-postgres/12-sections-404.png" alt="GET /api/courses/999/sections against Postgres, 404 course not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/999/sections \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+<details class="recreate teardown">
+  <summary>Tear down this environment</summary>
+  <div class="body">
+    <ol>
+      <li>Stop the app first: <code>Ctrl+C</code> in the terminal running <code>mvn spring-boot:run</code> (or the Stop button in an IDE). This is the step that actually matters here — it lets HikariCP (the connection pool the app uses) close every open connection to Postgres cleanly. Killing the terminal window itself instead (rather than the process inside it) can skip that, leaving connections sitting in Postgres until its own timeout reaps them.</li>
+      <li>Optional verification, with the container still running: confirm nothing is still holding a connection open against <code>enlightenment</code>:
+        <pre>docker exec ahaspace-postgres psql -U ahaspace -d enlightenment -c "SELECT pid, state, query FROM pg_stat_activity WHERE datname = 'enlightenment';"</pre>
+        Should return no rows (or just this <code>psql</code> command's own session) once the app is actually stopped.
+      </li>
+      <li>Decide what to do with the container itself:
+        <ul>
+          <li>Testing again soon? Leave it running — <code>docker compose up -d</code> is safe to re-run any time, so there's no cost to leaving the container up between sessions.</li>
+          <li>Done for now and want to free the port/CPU, but keep your data (courses/sections/users you inserted): <pre>docker compose down</pre></li>
+          <li>Want to wipe the database and start from empty next time: add <code>-v</code> to also delete the named volume: <pre>docker compose down -v</pre> This is destructive — it deletes <code>ahaspace-postgres-data</code>, which is the only thing that makes your rows survive a container restart. Not the default; only do this deliberately.</li>
+        </ul>
+      </li>
+      <li>Clear the shell variable from step 08: <pre>unset TOKEN</pre></li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== COMMON ERRORS ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">Two errors interns are likely to hit when getting this backend running locally, with the exact diagnosis and fix applied each time.</p>
+
+<section class="step">
+  <div class="step-head"><h2>"Port 8080 was already in use" on startup</h2></div>
+  <p class="step-note">Spring Boot's <code>APPLICATION FAILED TO START</code> banner, with <strong>Description: Web server failed to start. Port 8080 was already in use.</strong> Cause: a previous run of this same app (commonly an IDE "Run" that was stopped but whose JVM process didn't actually terminate) is still alive and holding the port, so the new run can't bind to it.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find whatever process is listening on 8080:
+          <pre>lsof -nP -iTCP:8080 -sTCP:LISTEN</pre>
+          This returns a PID (and confirms it's a <code>java</code> process, not something unrelated using the same port).</li>
+        <li>Confirm it's the stale app instance before killing anything:
+          <pre>ps -p &lt;PID&gt; -o pid,ppid,etime,command</pre>
+          Look for <code>EnlightenmentApplication</code> in the command line and an <code>ELAPSED</code> time that predates the run you just tried to start.</li>
+        <li>Stop it gracefully first (lets the JVM close DB connections, etc.):
+          <pre>kill -15 &lt;PID&gt;</pre></li>
+        <li>Re-check with <code>lsof</code>; if the process is still listed after a few seconds, force it:
+          <pre>kill -9 &lt;PID&gt;</pre></li>
+        <li>Re-run the app — port 8080 is free.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Postgres <code>dev</code> profile: driver error mentioning <code>${DB_URL}</code> literally</h2></div>
+  <p class="step-note">Full error: <code>Driver org.postgresql.Driver claims to not accept jdbcUrl, ${DB_URL}</code>. Cause: <code>spring.datasource.url/username/password</code> in <code>application-dev.yaml</code> are bound through <code>@ConfigurationProperties</code> (<code>DataSourceProperties</code>), which does not fail at bind time on an unresolved <code>${...}</code> placeholder — it leaves the literal string in place, and the failure only surfaces later when Hikari/the driver tries to use it. Made worse by three onboarding gaps: <code>application-dev.yaml</code> is git-ignored (it also holds a real secret, the Gemini API key) so a fresh clone has no copy and no record of what keys it needs; the matching Postgres container was a manually-run, undocumented <code>docker run</code>; and the README still described H2 in-memory as the database.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Committed <code>docker-compose.yml</code> at the <code>AhaSpace/</code> repo root defining one <code>postgres:16</code> service — container name <code>ahaspace-postgres</code>, <code>POSTGRES_DB=enlightenment</code>, <code>POSTGRES_USER=ahaspace</code>, <code>POSTGRES_PASSWORD=ahaspace</code>, port <code>5432:5432</code> — so this container config is now the single source of truth for the DB credentials, instead of independently-typed prose.</li>
+        <li>Committed <code>src/main/resources/application-dev.yaml.example</code> with real working defaults for <code>DB_URL</code>, <code>DB_USERNAME</code>, <code>DB_PASSWORD</code> (matching the compose file above) and a placeholder for <code>gemini.api.key</code>. The real <code>application-dev.yaml</code> stays git-ignored — DB connection values for a fixed local dev container aren't secrets, only the Gemini key is.</li>
+        <li>Updated the README's "Getting Started" section: replaced <code>Database: H2 (in-memory)</code> with Postgres, and added the actual onboarding steps:
+          <pre>docker compose up -d
+cp src/main/resources/application-dev.yaml.example src/main/resources/application-dev.yaml
+# then fill in your own gemini.api.key inside that copied file</pre>
+        </li>
+        <li>Run with the <code>dev</code> profile, exporting all three DB variables in the <em>same</em> command as <code>mvn</code> — this is the step that broke earlier when the variables were exported on a separate line first and never reached the <code>mvn</code> subprocess:
+          <pre>DB_URL=jdbc:postgresql://localhost:5432/enlightenment \
+DB_USERNAME=ahaspace \
+DB_PASSWORD=ahaspace \
+mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+        </li>
+        <li>Confirms the fix: if you now see Hibernate's real DDL (<code>Hibernate: create table courses (id bigserial not null, ...)</code>) instead of the <code>${DB_URL}</code> driver error, the placeholder resolved correctly.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

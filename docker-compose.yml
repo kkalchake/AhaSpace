@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ahaspace-postgres
+    environment:
+      POSTGRES_DB: enlightenment
+      POSTGRES_USER: ahaspace
+      POSTGRES_PASSWORD: ahaspace
+    ports:
+      - "5432:5432"
+    volumes:
+      - ahaspace-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  ahaspace-postgres-data:
