@@ -1,0 +1,22 @@
+jwt:
+  secret: aha-dev-secret-key-must-be-at-least-32-chars-long
+  expiration: 3600000
+
+gemini:
+  api:
+    key: YOUR_GEMINI_API_KEY_HERE
+  model: gemini-2.5-flash-lite
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/enlightenment
+    username: ahaspace
+    password: ahaspace
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
