@@ -18,7 +18,6 @@ public class ChatSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ManyToOne: each session belongs to exactly one user; produces user_id FK column
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -26,7 +25,6 @@ public class ChatSession {
     @Column(nullable = false)
     private String title;
 
-    // CreationTimestamp: Hibernate sets this once on INSERT, never updates it
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

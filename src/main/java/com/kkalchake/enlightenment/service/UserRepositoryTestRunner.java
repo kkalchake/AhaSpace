@@ -5,12 +5,11 @@ import com.kkalchake.enlightenment.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-@Component // This makes Spring manage this class
+@Component
 public class UserRepositoryTestRunner implements CommandLineRunner {
 
     private final UserRepository userRepository;
 
-    // Constructor Injection: Spring will provide the UserRepository automatically
     public UserRepositoryTestRunner(UserRepository userRepository) {
         this.userRepository = userRepository;
     }

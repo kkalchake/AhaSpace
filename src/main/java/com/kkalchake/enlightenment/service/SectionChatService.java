@@ -37,7 +37,6 @@ public class SectionChatService {
         SectionChatSession session;
 
         if (sessionId == null) {
-            // No sessionId provided: create a new session for this user, scoped to this section
             var user = userRepository.findByUsername(username)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
             session = new SectionChatSession();
@@ -104,6 +103,25 @@ public class SectionChatService {
                 .map(m -> new SectionChatMessageDto(m.getId(), m.getRole(), m.getContent(), m.getModel(), m.getCreatedAt()))
                 .collect(Collectors.toList());
         return new SectionChatSessionDetailDto(session.getId(), session.getTitle(), session.getCreatedAt(), messageDtos);
+    }
+
+    // Deletes the session row and, via cascade configured on SectionChatSession.messages,
+    // all of its SectionChatMessage rows. delete(session) is used (rather than deleteById)
+    // because the entity is already loaded for the ownership/section checks below.
+    @Transactional
+    public void deleteSession(Long sectionId, Long sessionId, String username) {
+        SectionChatSession session = sectionChatSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+        // Ownership check: prevent users from deleting another user's session
+        if (!session.getUser().getUsername().equals(username)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+        // Section-match check: a sessionId that exists but belongs to a different section
+        // must 404, not delete a session outside the section the caller is scoped to
+        if (!session.getSection().getId().equals(sectionId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found");
+        }
+        sectionChatSessionRepository.delete(session);
     }
 
     // Truncate to 50 chars so the sidebar title stays readable

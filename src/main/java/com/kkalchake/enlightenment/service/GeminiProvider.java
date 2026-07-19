@@ -23,7 +23,6 @@ public class GeminiProvider implements AiProvider {
     private final ObjectMapper objectMapper;
 
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-    // https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent
     @Autowired
     public GeminiProvider(
             RestClient.Builder restClientBuilder,
@@ -65,7 +64,6 @@ public class GeminiProvider implements AiProvider {
         try {
             String response = restClient.post()
                     .uri("/v1beta/models/{model}:generateContent?key={apiKey}", model, apiKey)
-                    // https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent
                     .body(requestBody)
                     .retrieve()
                     .body(String.class);

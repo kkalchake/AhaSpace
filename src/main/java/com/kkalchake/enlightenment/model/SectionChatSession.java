@@ -33,7 +33,6 @@ public class SectionChatSession {
     @Column(nullable = false)
     private String title;
 
-    // CreationTimestamp: Hibernate sets this once on INSERT, never updates it
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
