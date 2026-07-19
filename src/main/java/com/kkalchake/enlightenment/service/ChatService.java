@@ -32,7 +32,6 @@ public class ChatService {
         ChatSession session;
 
         if (sessionId == null) {
-            // No sessionId provided: create a new session for this user
             var user = userRepository.findByUsername(username)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
             session = new ChatSession();
@@ -87,6 +86,21 @@ public class ChatService {
                 .map(m -> new ChatMessageDto(m.getId(), m.getRole(), m.getContent(), m.getModel(), m.getCreatedAt()))
                 .collect(Collectors.toList());
         return new ChatSessionDetailDto(session.getId(), session.getTitle(), session.getCreatedAt(), messageDtos);
+    }
+
+    // Deletes the session row and, via cascade configured on ChatSession.messages,
+    // all of its ChatMessage rows. delete(session) is used (rather than deleteById)
+    // because the entity is already loaded for the ownership check below — no extra
+    // query needed, and cascade behavior is identical either way.
+    @Transactional
+    public void deleteSession(Long sessionId, String username) {
+        ChatSession session = chatSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+        // Ownership check: prevent users from deleting another user's session
+        if (!session.getUser().getUsername().equals(username)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+        chatSessionRepository.delete(session);
     }
 
     // Truncate to 50 chars so the sidebar title stays readable

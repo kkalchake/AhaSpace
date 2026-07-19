@@ -43,8 +43,8 @@ public class JwtFilter extends OncePerRequestFilter {
                     MDC.put("username", username);
                 }
             } catch (Exception e) {
-                // Token invalid - continue without authentication, but log it instead of
-                // swallowing silently so failed-auth attempts are visible in the logs.
+                // Continue unauthenticated rather than failing the request; WARN keeps
+                // failed auth attempts visible in the logs.
                 log.warn("JWT validation failed for {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
             }
         }

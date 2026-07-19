@@ -56,4 +56,10 @@ public class ChatController {
         // ResponseStatusException from the service propagates through Spring MVC with the correct HTTP status
         return ResponseEntity.ok(chatService.getSession(sessionId, authentication.getName()));
     }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<Void> deleteSession(@PathVariable Long sessionId, Authentication authentication) {
+        chatService.deleteSession(sessionId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
 }

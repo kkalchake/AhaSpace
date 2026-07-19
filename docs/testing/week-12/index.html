@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 12 — Local Validation</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .lvl { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 2px; font-weight: 700; letter-spacing: 0.03em; }
+  .lvl.get { background: var(--inverse-bg); color: var(--inverse); }
+  .lvl.del { background: var(--danger-bg); color: var(--danger); }
+  .lvl.ok { background: var(--good-bg); color: var(--good); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .shot-caption { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin: 6px 0 0; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .status { color: var(--danger); font-weight: 700; }
+  .term .status.ok { color: var(--good); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .dialog-note {
+    margin-top: 14px; border: 1px dashed var(--inverse); background: var(--inverse-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .dialog-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--inverse); display: block; margin-bottom: 6px; }
+  .dialog-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 12 — Delete conversation</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub">This week adds the one piece of the assistant that was missing since it first shipped: a way to actually get rid of a conversation. Two new <code>DELETE</code> endpoints — one on the account-wide chat, one on the section-scoped chat — plus a small "×" button in the shared <code>SessionSidebar.jsx</code> component that both chat surfaces already render. No new database tables, no new columns: both endpoints delete rows out of the exact same <code>ChatSession</code>/<code>SectionChatSession</code> tables that Weeks 7–10 already created, and the cascade that removes a session's messages along with it was already configured on those entities before this week touched anything. Every request below is a real one against a locally running backend; every browser screenshot is a real headless-Chromium capture of the actual React app, not a mockup.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01–02</td><td>Register two accounts, log in, capture both JWTs</td><td>200s, two usable tokens</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">03–05</td><td><code>DELETE /api/chat/sessions/{id}</code> — success, then a second delete on the same id, then someone else's session</td><td><code>204</code>, then <code>404</code>, then <code>403</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06–07</td><td><code>DELETE /api/courses/{c}/sections/{s}/chat/sessions/{id}</code> — success, then the same session id through the wrong section's URL</td><td><code>204</code>, then <code>404</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08–11</td><td>Browser: global Chat page — sidebar with delete buttons, select a session, cancel a delete, confirm a delete</td><td>Row survives cancel, row + active-session reset after confirm</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">12–14</td><td>Browser: section assistant — open a section, ask a question, delete the resulting session</td><td>New row appears, then disappears on confirm</td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Same two-repo shape as Week 10: Postgres via Docker, backend on the <code>dev</code> profile, frontend on Vite. Nothing about the run commands changed this week — no new dependencies, no new environment variables, no schema migration to wait for.</p>
+
+<details class="recreate setup">
+  <summary>Start the backend</summary>
+  <div class="body">
+    <ol>
+      <li>Kill any backend still holding port 8080 from a previous run. Safe to run even if nothing is listening:
+        <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true</pre>
+      </li>
+      <li>Make sure the Postgres container is up (idempotent — safe whether it's already running or not):
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+      <li>Run the app with the <code>dev</code> profile:
+        <pre>mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+        As of Week 11, <code>application-dev.yaml</code> has the Postgres connection values and the Gemini API key written in directly rather than as <code>${DB_URL}</code>-style placeholders, so there's nothing to export inline.
+      </li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. No new tables are created on this startup — <code>ChatSession</code>/<code>SectionChatSession</code> already existed, and this week's <code>deleteSession</code> methods only add queries against them, not schema.</li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the frontend</summary>
+  <div class="body">
+    <ol>
+      <li>From the frontend repo root:
+        <pre>cd AhaSpaceUI
+npm install
+npm run dev</pre>
+      </li>
+      <li>Vite prints <code>Local: http://localhost:3000/</code> — <strong>not</strong> the Vite default of 5173. <code>vite.config.js</code> pins <code>server.port: 3000</code> deliberately, because <code>SecurityConfig</code>'s CORS policy only allows <code>http://localhost:3000</code> as an origin (<code>allowedMethods</code> there already includes <code>DELETE</code>, confirmed during Phase 6 verification, so this week's new requests aren't blocked by CORS on top of everything else). If port 3000 is already occupied by something else, Vite silently falls back to 3001 instead of erroring — and then every request from the browser gets rejected by CORS with no obviously-related error message. See Troubleshooting below.</li>
+      <li>No new npm packages this week — <code>SessionSidebar.jsx</code>'s delete button is a plain <code>&lt;button&gt;</code>, and the confirmation dialog is the browser's own <code>window.confirm()</code>, not a component.</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== AUTH ============================== -->
+<details class="group" open>
+<summary class="group-label">Auth-gated flow</summary>
+<p class="group-intro">Both new endpoints require a real <code>Authorization: Bearer</code> header — <code>Authentication.getName()</code> is what both <code>ChatService.deleteSession</code> and <code>SectionChatService.deleteSession</code> compare against the session's owner. Two accounts are created here on purpose: <code>week12_tester</code> owns every session created below, and <code>week12_tester_two</code> exists purely to prove the 403 ownership check in step 05 — a session created by one user has to be genuinely invisible-to-delete for another, even with a completely valid token.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>Register two test users</h2></div>
+  <p class="step-note"><code>POST /api/auth/register</code>, run twice. Unchanged since Week 9 — nothing about registration was touched this week.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester","password":"testpass123"}'
+<span class="status ok">{"message":"User registered successfully"}</span>
+
+$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester_two","password":"testpass123"}'
+<span class="status ok">{"message":"User registered successfully"}</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Pick usernames you haven't used before — registering the same one twice fails with a 409.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Log in, capture both JWTs</h2></div>
+  <p class="step-note"><code>$TOKEN</code> (week12_tester) is the Authorization header for every "success" and "owner" call below; <code>$TOKEN2</code> (week12_tester_two) is only used in step 05, to demonstrate the 403.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+$ TOKEN2=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester_two","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+TOKEN2=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week12_tester_two","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT 1 ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: DELETE /api/chat/sessions/&#123;sessionId&#125;</summary>
+<p class="group-intro"><code>ChatController.deleteSession</code>, new this week, delegating straight to <code>ChatService.deleteSession</code>. The method mirrors the existing <code>getSession</code>'s ownership pattern exactly (same class, a few lines above it): load by id — 404 if nothing comes back — then compare <code>session.getUser().getUsername()</code> against the caller — 403 if it doesn't match — then <code>chatSessionRepository.delete(session)</code>. The entity is deleted rather than looked up again by id because it's already loaded from the ownership check; <code>ChatSession.messages</code> already carries <code>cascade = CascadeType.ALL</code>, so this one call also removes every message row belonging to the session, in the same transaction.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Success — 204, session and its messages gone</h2></div>
+  <p class="step-note">First, a real session is created by asking the assistant a question — the same <code>POST /api/chat</code> flow from earlier weeks — so there's something real to delete. <code>GET /api/chat/sessions</code> before and after shows the row present, then gone. The <code>DELETE</code> response itself has <strong>no body</strong> — <code>ResponseEntity.noContent().build()</code> — which is why <code>-i</code> is used here instead of piping through <code>python3 -m json.tool</code>: there's nothing to parse, only headers and the status line matter.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is an integral?"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['sessionId'])"
+1
+
+$ curl -s localhost:8080/api/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="dim">[{"id":1,"title":"What is an integral?","createdAt":"2026-07-19T19:21:48.523534"}]</span>
+
+$ curl -s -i -X DELETE localhost:8080/api/chat/sessions/1 -H "Authorization: Bearer $TOKEN"
+<span class="status ok">HTTP/1.1 204</span>
+<span class="dim">Vary: Origin
+X-Content-Type-Options: nosniff
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate</span>
+
+$ curl -s localhost:8080/api/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="status ok">[]</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is an integral?"}'
+# note the "sessionId" in the response, then:
+curl -s -i -X DELETE localhost:8080/api/chat/sessions/&lt;that id&gt; \
+  -H "Authorization: Bearer $TOKEN"</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Failure — the same id again, 404</h2></div>
+  <p class="step-note">Deleting an id that no longer exists (or never did) hits <code>chatSessionRepository.findById(sessionId).orElseThrow(...)</code> before the ownership check ever runs — there's no session to check ownership on. Same <code>ResponseStatusException(NOT_FOUND, "Session not found")</code> that <code>getSession</code> already throws for the same condition; the error body comes from the existing <code>GlobalExceptionHandler</code>, unchanged by this week.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X DELETE localhost:8080/api/chat/sessions/1 -H "Authorization: Bearer $TOKEN"
+<span class="status">HTTP/1.1 404</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"error":"Session not found"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Run step 03's <code>DELETE</code> a second time against the same id — or any id that was never created, e.g. <code>9999</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Failure — someone else's session, 403</h2></div>
+  <p class="step-note"><code>week12_tester</code> creates a fresh session; <code>week12_tester_two</code> (a completely different, validly-authenticated account) tries to delete it with <code>$TOKEN2</code>. The session is found — it exists — so this fails one step later than step 04, on the <code>!session.getUser().getUsername().equals(username)</code> check, with <code>ResponseStatusException(FORBIDDEN, "Access denied")</code>. A real second account, not a forged token, is what actually exercises this branch — a request with no token or a garbage token would hit <code>JwtFilter</code> and never reach the controller at all.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"Explain the chain rule briefly"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['sessionId'])"
+2
+
+$ curl -s -i -X DELETE localhost:8080/api/chat/sessions/2 -H "Authorization: Bearer $TOKEN2"
+<span class="status">HTTP/1.1 403</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"error":"Access denied"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i -X DELETE localhost:8080/api/chat/sessions/&lt;week12_tester's session id&gt; \
+  -H "Authorization: Bearer $TOKEN2"</pre>
+      <p>This session (id <code>2</code> above) is kept alive on purpose — it's reused in the browser walkthrough below.</p></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT 2 ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: DELETE /api/courses/&#123;courseId&#125;/sections/&#123;sectionId&#125;/chat/sessions/&#123;sessionId&#125;</summary>
+<p class="group-intro"><code>SectionChatController.deleteSession</code> → <code>SectionChatService.deleteSession</code>. Same not-found/ownership pattern as the global endpoint above (404 for a missing id, 403 for a session that belongs to a different user, both proven identically there — not re-demonstrated here to avoid repeating the same check twice). What's actually new to this specific endpoint is a <strong>third</strong> check that the global one has no equivalent for: the session has to belong to the <code>sectionId</code> in the URL, not just exist and be owned by the caller. <code>courseId</code> in the path is decorative — declared for URL consistency with the rest of <code>/api/courses/{courseId}/...</code>, never read inside the method body, same as every other handler in this controller.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Success — 204, scoped to one section</h2></div>
+  <p class="step-note">Course 1 ("Calculus Basics") has two sections in this local database — 22 and 23. A session is created against section 22, then deleted through the matching section-22 URL.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/courses/1/sections/22/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is differentiation?"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['sessionId'])"
+3
+
+$ curl -s localhost:8080/api/courses/1/sections/22/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="dim">[{"id":3,"title":"What is differentiation?","createdAt":"2026-07-19T19:22:20.947805"}]</span>
+
+$ curl -s -i -X DELETE localhost:8080/api/courses/1/sections/22/chat/sessions/3 \
+  -H "Authorization: Bearer $TOKEN"
+<span class="status ok">HTTP/1.1 204</span>
+
+$ curl -s localhost:8080/api/courses/1/sections/22/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="status ok">[]</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is differentiation?"}'
+# then delete the returned sessionId through the same course/section URL
+curl -s -i -X DELETE localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat/sessions/&lt;id&gt; \
+  -H "Authorization: Bearer $TOKEN"</pre>
+      <p>If this local database has no courses/sections yet, <code>GET /api/courses</code> and <code>GET /api/courses/&lt;id&gt;/sections</code> (both pre-existing, read-only, unchanged this week) list whatever exists.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Failure — right session, wrong section in the URL, 404</h2></div>
+  <p class="step-note">This is the check this endpoint adds on top of the shared pattern. A session is created against section <strong>23</strong>, then deleted through section <strong>22</strong>'s URL instead — a URL that is otherwise completely well-formed, with a real course id and a real section id, just not <em>this session's</em> section. <code>SectionChatService.deleteSession</code> finds the session (it exists), confirms <code>week12_tester</code> owns it (they do), and only then checks <code>!session.getSection().getId().equals(sectionId)</code> — <code>23 != 22</code> — and throws the same <code>ResponseStatusException(NOT_FOUND, "Session not found")</code> a genuinely nonexistent id would produce. The response body can't distinguish "this id has never existed" from "this id exists, just not here" — both read identically as <code>404</code>, which is deliberate: it doesn't leak whether a session id is valid-but-elsewhere to a caller who has no business knowing that.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/courses/1/sections/23/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is the power rule?"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['sessionId'])"
+4
+
+$ curl -s -i -X DELETE localhost:8080/api/courses/1/sections/22/chat/sessions/4 \
+  -H "Authorization: Bearer $TOKEN"
+<span class="status">HTTP/1.1 404</span>
+{"error":"Session not found"}
+
+$ curl -s localhost:8080/api/courses/1/sections/23/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="dim">[{"id":4,"title":"What is the power rule?","createdAt":"2026-07-19T19:22:36.551651"}]</span> <span class="dim">← still there</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_A/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is the power rule?"}'
+# then delete the returned sessionId through a DIFFERENT section's URL
+curl -s -i -X DELETE localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_B/chat/sessions/&lt;id&gt; \
+  -H "Authorization: Bearer $TOKEN"</pre>
+      <p>Needs a course with at least two sections. The seeded "Calculus Basics" course has exactly two.</p></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FRONTEND: GLOBAL CHAT ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — global Chat page</summary>
+<p class="group-intro">Real browser screenshots, headless Chromium via Playwright, driving the actual app on <code>http://localhost:3000</code>. <code>SessionSidebar.jsx</code> is a single shared component — everything shown here for <code>/chat</code> is the identical code path <code>SectionAssistantPanel</code> uses lower down, just wired to <code>Chat.jsx</code>'s <code>handleDeleteSession</code> instead. Logged in as <code>week12_tester</code>, whose sidebar already has two sessions going into this section: the one from step 05 above ("Explain the chain rule briefly"), plus one more created for this walkthrough ("What is an integral?").</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Sidebar shows the "×" on every row, always</h2></div>
+  <p class="step-note">Per decisions.md's "Button placement" choice, the delete control is always visible rather than hover-only — there's no mouseover state to trigger, it's simply part of each row's layout. <code>SessionSidebar</code> lays each row out as <code>display: flex, justifyContent: space-between</code>: the title/date stack on the left, the "×" button (<code>aria-label="Delete conversation"</code>) pinned to the right edge.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/02-chat-sidebar-sessions.png" alt="Global chat sidebar showing two sessions, each with a red delete times button on the right"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Log in, then open <code>http://localhost:3000/chat</code>. Any account with at least one saved session shows this — send one message first via <strong>+ New Chat</strong> if the sidebar is empty.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>Select a session — it becomes active</h2></div>
+  <p class="step-note">Clicking anywhere on a row except the "×" fires <code>onSelectSession</code>, which is the row's own <code>onClick</code>. This matters for the next two steps: the delete button sits <em>inside</em> that same clickable row, so without <code>e.stopPropagation()</code> in its own <code>onClick</code>, pressing "×" would also select the session a moment before deleting it. <code>e.stopPropagation()</code> is what keeps those two actions independent.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/03-chat-session-active.png" alt="Chat page with the top session selected, showing its saved question and Gemini answer, sidebar entry highlighted"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click a session's title/date area (not the "×") to load it.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>Click "×", then Cancel — nothing happens</h2></div>
+  <p class="step-note">Clicking "×" runs <code>onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}</code>, and <code>handleDeleteSession</code>'s very first line is <code>if (!window.confirm(...)) return;</code> — no <code>fetch</code> call happens until that returns <code>true</code>. Cancelling the dialog returns <code>false</code>, so the function returns immediately: no request is sent, no state changes, the row is exactly as it was.</p>
+  <div class="dialog-note">
+    <span class="k">window.confirm() — captured via Playwright's dialog event, dialog.dismiss() called</span>
+    <code>"Delete this conversation? This cannot be undone."</code>
+  </div>
+  <p class="step-note" style="margin-top:14px;">Headless Chromium doesn't paint native <code>confirm()</code>/<code>alert()</code> dialogs into the page's own pixel buffer, so there's no meaningful screenshot to take <em>of</em> the dialog itself — Playwright intercepts it as a browser event instead, and the text above is that event's real <code>message</code> property from this actual run, not a transcription. The screenshot below is the state <em>after</em> dismissing it: same two sessions, nothing changed.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/04-chat-after-cancel.png" alt="Same two sessions still present after cancelling the delete confirmation, active session still selected"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click the "×" on any session row. The browser shows a native confirm dialog reading <em>"Delete this conversation? This cannot be undone."</em> Click <strong>Cancel</strong>. The row is still there.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>Click "×" again, Confirm — row gone, panel resets</h2></div>
+  <p class="step-note">This time <code>window.confirm()</code> resolves <code>true</code>, so <code>handleDeleteSession</code> sends the real <code>DELETE /api/chat/sessions/{id}</code> exercised via curl in steps 03–05. On a <code>res.ok</code> response it checks <code>if (sessionId === activeSessionId) handleNewSession()</code> — per decisions.md's "Active-session delete" choice, the deleted session here <em>was</em> the active one (from step 09), so the chat panel resets to the same blank "Start a conversation by sending a message below" state as clicking <strong>+ New Chat</strong>, rather than trying to guess which other session should become active next. <code>loadSessions()</code> then re-fetches the list either way, which is what actually removes the row from the sidebar.</p>
+  <div class="dialog-note">
+    <span class="k">window.confirm() — captured via Playwright's dialog event, dialog.accept() called</span>
+    <code>"Delete this conversation? This cannot be undone."</code>
+  </div>
+  <div class="shot-wrap"><img class="shot" src="screenshots/05-chat-after-confirm-delete.png" alt="Sidebar now shows only one remaining session, chat panel reset to the blank new-conversation placeholder"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click the "×" on the currently-active session's row again, then click <strong>OK</strong>/<strong>Delete</strong> on the confirm dialog instead of Cancel. The row disappears and the right-hand panel goes back to its empty starting state.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FRONTEND: SECTION ASSISTANT ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — section assistant panel</summary>
+<p class="group-intro"><code>SectionAssistantPanel.jsx</code>, mounted inside <code>SectionView</code> at <code>/courses/1/sections/22</code>. Its own <code>handleDeleteSession</code> is a near copy of <code>Chat.jsx</code>'s — same <code>confirm()</code> gate, same <code>res.ok</code>/active-session-reset/<code>loadSessions()</code> shape — the only real difference is the URL it hits, <code>${basePath}/sessions/${sessionId}</code>, which is already scoped to this course and section rather than the account-wide <code>/api/chat/sessions</code>. Section 22 starts with no saved sessions in this run (it was cleared by step 06's curl call above), so the empty-state screenshot below is genuine, not staged.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>Open a section — assistant panel starts empty</h2></div>
+  <p class="step-note">The left pane renders the section's Markdown content (unrelated to this week — Week 10's rendering pipeline). The right pane is <code>SectionAssistantPanel</code>: no sessions yet, so the sidebar under "+ New Chat" is blank and the message area shows its own placeholder text.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/06-section-view-empty.png" alt="Section view for Introduction to Calculus, assistant panel on the right showing no sessions and an empty message area"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From <code>/courses</code>, click a course, then click a section — or open <code>http://localhost:3000/courses/1/sections/22</code> directly.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">13</span><h2>Ask a question — a new session appears with its own "×"</h2></div>
+  <p class="step-note">Sending a message with no active session <code>POST</code>s to <code>basePath</code> with <code>sessionId: null</code>, which creates a brand-new <code>SectionChatSession</code> server-side — the same mechanism as step 06's curl call, just triggered from the UI. <code>loadSessions()</code> runs afterward and the new row shows up in the sidebar with the same always-visible "×" as the global chat's sidebar, because it's the exact same <code>SessionSidebar</code> component rendering it.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/07-section-after-question.png" alt="Section assistant panel after asking a question, showing the question, a real Gemini answer, and the new session in the sidebar with a delete button"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Type a question in the right-hand panel's input, e.g. <em>"What is differentiation in one sentence?"</em></li>
+        <li>Click <strong>Send</strong> and wait a few seconds for the real Gemini round trip.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">14</span><h2>Delete it — confirm, row gone, panel resets</h2></div>
+  <p class="step-note">Same confirm-then-DELETE-then-reset sequence as the global chat's step 11, run against <code>DELETE /api/courses/1/sections/22/chat/sessions/{id}</code> instead. The session just created in step 13 is the active one, so per decisions.md it resets to the blank "Ask a question about this section below" state rather than trying to select something else.</p>
+  <div class="dialog-note">
+    <span class="k">window.confirm() — captured via Playwright's dialog event, dialog.accept() called</span>
+    <code>"Delete this conversation? This cannot be undone."</code>
+  </div>
+  <div class="shot-wrap"><img class="shot" src="screenshots/08-section-after-delete.png" alt="Section assistant panel after confirming the delete, sidebar empty again, message area back to its placeholder"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click the "×" on the session created in step 13, then confirm the dialog.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== DATA LAYER NOTE ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer</summary>
+<p class="group-intro">Deliberately brief — this week adds no tables, no columns, no migrations. <code>ChatSession</code>, <code>SectionChatSession</code>, and their message tables are exactly what Weeks 7–10 already created. <code>ChatSessionRepository</code>/<code>SectionChatSessionRepository</code> both already extended <code>JpaRepository</code>, so <code>delete(entity)</code> was inherited, not written; and both session entities already had <code>@OneToMany(mappedBy = "session", cascade = CascadeType.ALL)</code> on their <code>messages</code> relationship from whenever those entities were first created, so a session's messages disappear in the same delete call with no extra code. Nothing here needed a database inspection step the way Week 10's new tables did.</p>
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">One carries forward unchanged; one is an extension of a Week 10 note that's easy to trip over specifically while working through <em>this</em> week's browser steps; one is new, about testing dialogs rather than about the app itself.</p>
+
+<section class="step">
+  <div class="step-head"><h2>"Port 8080 was already in use" on startup <em>(carried forward)</em></h2></div>
+  <p class="step-note">Spring Boot's <code>APPLICATION FAILED TO START</code> banner. Cause: a previous run of this same app is still alive and holding the port.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find the process: <pre>lsof -nP -iTCP:8080 -sTCP:LISTEN</pre></li>
+        <li>Confirm it's the stale app: <pre>ps -p &lt;PID&gt; -o pid,ppid,etime,command</pre></li>
+        <li>Stop it: <pre>kill -15 &lt;PID&gt;</pre> then <pre>kill -9 &lt;PID&gt;</pre> if it's still listed a few seconds later.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: the frontend silently comes up on 3001 instead of 3000</h2></div>
+  <p class="step-note">Hit while preparing this guide: a stray <code>vite</code> process from an earlier session was already holding port 3000. Starting a second <code>npm run dev</code> didn't fail — Vite just printed <code>Port 3000 is in use, trying another one...</code> and came up on 3001 instead, which looks like a completely normal, successful startup in the terminal. The problem only shows up one step later, as CORS: <code>SecurityConfig</code>'s CORS policy allows exactly <code>http://localhost:3000</code> (Week 10's note above), so every <code>fetch</code> call from a page served on 3001 — including this week's new <code>DELETE</code> requests — gets rejected by the browser before it even reaches the backend, with a generic "Network error" message on screen and a CORS error in the devtools console, not an HTTP status code to debug from.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find whatever's already on 3000: <pre>lsof -nP -iTCP:3000 -sTCP:LISTEN</pre></li>
+        <li>If it's an old <code>vite</code> process for this same project, kill it and restart <code>npm run dev</code> cleanly rather than letting a second instance fall back to 3001.</li>
+        <li>Confirm the terminal actually prints <code>Local: http://localhost:3000/</code>, not 3001, before opening the browser.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: can't screenshot the confirm() dialog itself</h2></div>
+  <p class="step-note">Only relevant if you're driving this guide's browser steps with your own Playwright script rather than clicking through by hand. Registering a <code>page.on('dialog', ...)</code> handler and calling <code>page.screenshot()</code> from <em>inside</em> that handler — while the dialog is still open — deadlocks: Playwright's sync API can't run a second page-level command while the dialog callback that would unblock the first one is still executing. The dialog has to be accepted or dismissed first; only then can the next screenshot be taken, which is necessarily a screenshot of the page <em>after</em> the dialog closed, not during.</p>
+  <details class="recreate">
+    <summary>What actually resolved it</summary>
+    <div class="body">
+      <ol>
+        <li>Capture <code>dialog.message</code> (and <code>dialog.type</code>) inside the handler, then call <code>dialog.accept()</code> or <code>dialog.dismiss()</code> — don't attempt a screenshot from inside that same callback.</li>
+        <li>Take the actual screenshot immediately after, once control returns to the main script. That's what steps 10, 11, and 14 above show: a quoted, real <code>dialog.message</code> string next to a screenshot of the resulting state, instead of a picture of the dialog box itself.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
