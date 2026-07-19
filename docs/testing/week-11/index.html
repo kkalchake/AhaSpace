@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 11 — Local Validation</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .lvl { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 2px; font-weight: 700; letter-spacing: 0.03em; }
+  .lvl.debug { background: var(--inverse-bg); color: var(--inverse); }
+  .lvl.warn { background: var(--owning-bg); color: var(--owning); }
+  .lvl.error { background: var(--danger-bg); color: var(--danger); }
+  .lvl.info { background: var(--good-bg); color: var(--good); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .DEBUG { color: var(--inverse); }
+  .term .WARN { color: var(--owning); }
+  .term .ERROR { color: var(--danger); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+
+  .env-card { margin-top: 12px; font-size: 13.5px; }
+  .env-card .row { display: flex; gap: 10px; margin: 4px 0; }
+  .env-card .k { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); width: 90px; flex: none; padding-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 11 — Structured logging</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub">Backend-only week — no frontend change, no schema change. The thing being verified isn't a new endpoint, it's new <em>observability</em> on the existing ones: every console log line below is copied verbatim from an actual local run against the running server, not a description of what should appear. A JWT for the auth-gated calls can come from curl directly against the backend (what this guide uses) or from the existing frontend if you'd rather click through a browser — the frontend doesn't need to be running for anything here.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01</td><td>Start backend, confirm log pattern is live</td><td>Console lines match <code>%d %level [user=...] %logger - %msg</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02–03</td><td>Register + login (both unauthenticated)</td><td><span class="lvl debug">DEBUG</span> line per call, <code>[user=anonymous]</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">04</td><td>Authenticated call with the JWT from step 03</td><td><span class="lvl debug">DEBUG</span> line, <code>[user=week11_tester]</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">05</td><td>Request with a malformed Authorization header</td><td><span class="lvl warn">WARN</span> from <code>JwtFilter</code>, no <span class="lvl debug">DEBUG</span> line (request never reaches the controller)</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06</td><td>Register with an invalid body</td><td><span class="lvl error">ERROR</span> from <code>GlobalExceptionHandler</code>, 400, body unchanged</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">07</td><td>Register with a username already taken</td><td><span class="lvl error">ERROR</span>, 409, body unchanged</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08</td><td>GET a course id that doesn't exist</td><td><span class="lvl error">ERROR</span>, 404, <code>[user=week11_tester]</code> — MDC survives into the exception handler</td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Only the backend needs to run. Nothing this week touches <code>AhaSpaceUI</code> or the database schema, so there's no frontend step and no Data layer group in this guide — see Troubleshooting below if you're used to those being here from prior weeks.</p>
+
+<details class="recreate setup">
+  <summary>Start the backend</summary>
+  <div class="body">
+    <ol>
+      <li>Kill any backend still holding port 8080 from a previous run. Safe to run even if nothing is listening:
+        <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true</pre>
+      </li>
+      <li>Make sure the Postgres container is up (idempotent — safe whether it's already running or not):
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+      <li>Run the app with the <code>dev</code> profile:
+        <pre>./mvnw spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+        Unlike some earlier weeks' guides, no <code>DB_URL</code>/<code>DB_USERNAME</code>/<code>DB_PASSWORD</code> environment variables are needed — this repo's <code>application-dev.yaml</code> now has the Postgres connection values written in directly rather than as <code>${DB_URL}</code>-style placeholders, so there's nothing to export.
+      </li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. Before that line, confirm the new pattern is actually attached — every line since the banner should already look like this, not Spring Boot's plain default format:
+        <div class="term"><div class="term-head">console — first lines after startup</div><pre><span class="dim">2026-07-19 18:40:45.583</span> INFO  <span class="dim">[user=anonymous]</span> c.k.e.EnlightenmentApplication - Starting EnlightenmentApplication using Java 21.0.9 with PID 54147
+<span class="dim">2026-07-19 18:40:45.584</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.e.EnlightenmentApplication - Running with Spring Boot v3.2.0, Spring v6.1.1
+<span class="dim">2026-07-19 18:40:45.584</span> INFO  <span class="dim">[user=anonymous]</span> c.k.e.EnlightenmentApplication - The following 1 profile is active: "dev"
+<span class="dim">…</span>
+<span class="dim">2026-07-19 18:40:46.129</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.enlightenment.filter.JwtFilter - Filter 'jwtFilter' configured for use
+<span class="dim">…</span>
+<span class="dim">2026-07-19 18:40:47.011</span> INFO  <span class="dim">[user=anonymous]</span> c.k.e.EnlightenmentApplication - Started EnlightenmentApplication in 1.58 seconds (process running for 1.696)</pre></div>
+        Two things worth pointing at: the <code>[user=anonymous]</code> segment is there on every line, including framework-internal ones with no request behind them at all — that's <code>%X{username:-anonymous}</code>'s default kicking in, since MDC has nothing set yet. And the second line is already <span class="lvl debug">DEBUG</span> — Spring's own <code>EnlightenmentApplication</code> logger, not <code>com.kkalchake.enlightenment</code>, happens to also emit one DEBUG line at boot; it's unrelated to this week's interceptor but a useful early confirmation that DEBUG-level output isn't being filtered out anywhere in the pipeline. This satisfies the plan's INFO example for free too — Spring Boot's own <code>Started ... in N seconds</code> line above is the INFO-level evidence; no code was written for it.
+      </li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== AUTH-GATED FLOW ============================== -->
+<details class="group" open>
+<summary class="group-label">Auth-gated flow — the four log levels, one real request at a time</summary>
+<p class="group-intro">This is the actual "every new/changed endpoint" verification for this week. <code>/api/auth/register</code>, <code>/api/auth/login</code>, and <code>/api/courses</code> are all pre-existing and completely unchanged in behavior — same status codes, same response bodies as before this week's PR. What's new is that each call now leaves a trace. Every command below was run for real against a live local server; every terminal block is the actual matching output, not a hand-written example.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Register — DEBUG, anonymous</h2></div>
+  <p class="step-note"><code>RequestLoggingInterceptor.preHandle</code> fires right after Spring MVC resolves <code>AuthController.register</code> as the handler, before the method body runs. <code>/api/auth/register</code> is <code>permitAll()</code> in <code>SecurityConfig</code>, so <code>JwtFilter</code> never puts anything into MDC for this request — the pattern's <code>%X{username:-anonymous}</code> default is what fills in <code>anonymous</code>.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console line</div><pre>$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}'
+{"message":"User registered successfully"}
+
+<span class="dim">2026-07-19 18:41:29.043</span> WARN  <span class="dim">[user=anonymous]</span> o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/auth/register' <span class="dim">(one-time Spring Security cache-warm log, unrelated to this week's changes)</span>
+<span class="dim">2026-07-19 18:41:29.047</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.e.i.RequestLoggingInterceptor - API request POST /api/auth/register -> called register</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}'</pre>
+      <p>Pick a username you haven't used before — registering the same one twice is step 07's demo, not this one.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Log in and capture the JWT — DEBUG, still anonymous</h2></div>
+  <p class="step-note"><code>/api/auth/login</code> is also <code>permitAll()</code>. Logging in successfully authenticates the <em>response</em> (it hands back a token) but the login <em>request itself</em> arrives with no <code>Authorization</code> header, so <code>JwtFilter</code> has nothing to validate and MDC stays unset — hence <code>anonymous</code> again here, even though the call succeeds and returns a usable token.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console line</div><pre>$ TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+<span class="dim">2026-07-19 18:41:29.198</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.e.i.RequestLoggingInterceptor - API request POST /api/auth/login -> called login</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+echo $TOKEN</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>An authenticated call — DEBUG, real username</h2></div>
+  <p class="step-note">Now send <code>$TOKEN</code> as a <code>Bearer</code> header on a real request. <code>JwtFilter</code> validates it, puts <code>username</code> into MDC right after populating <code>SecurityContextHolder</code>, and every log line for the rest of this request — including the interceptor's — renders it. Nothing was passed into <code>log.debug(...)</code> to make this happen; the interceptor's code is identical to step 02/03's, only the MDC state differs going in.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console line</div><pre>$ curl -s -o /dev/null -w "HTTP %{http_code}\n" localhost:8080/api/courses \
+  -H "Authorization: Bearer $TOKEN"
+HTTP 200
+
+<span class="dim">2026-07-19 18:41:46.262</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=week11_tester]</span> c.k.e.i.RequestLoggingInterceptor - API request GET /api/courses -> called getCourses</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -o /dev/null -w "HTTP %{http_code}\n" localhost:8080/api/courses \
+  -H "Authorization: Bearer $TOKEN"</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Malformed Authorization header — WARN</h2></div>
+  <p class="step-note">Before this week, <code>JwtFilter</code>'s catch block was <code>catch (Exception ignored)</code> — a bad token failed silently and the request just continued unauthenticated, indistinguishable in the logs from a request that never sent a token at all. Now it logs at <span class="lvl warn">WARN</span> with the method, URI, and exception message (no token value, no secret). Note there's <strong>no</strong> matching <span class="lvl debug">DEBUG</span> line from <code>RequestLoggingInterceptor</code> for this one: a malformed token means no authentication gets set, <code>SecurityConfig</code>'s <code>anyRequest().authenticated()</code> rejects the request with 403 inside the Spring Security filter chain, and it never reaches <code>DispatcherServlet</code>/the interceptor at all. The WARN line is the only trace this request leaves.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console line</div><pre>$ curl -s -o /dev/null -w "HTTP %{http_code}\n" localhost:8080/api/courses \
+  -H "Authorization: Bearer this.is.not.a.valid.jwt"
+HTTP 403
+
+<span class="dim">2026-07-19 18:41:51.746</span> <span class="WARN">WARN </span> <span class="dim">[user=anonymous]</span> c.k.enlightenment.filter.JwtFilter - JWT validation failed for GET /api/courses: Invalid compact JWT string: Compact JWSs must contain exactly 2 period characters, and compact JWEs must contain exactly 4.  Found: 5</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -o /dev/null -w "HTTP %{http_code}\n" localhost:8080/api/courses \
+  -H "Authorization: Bearer this.is.not.a.valid.jwt"</pre>
+      <p>Any string that isn't a real 3-part JWT works — an expired real token would hit the same <code>catch</code> block with a different exception message (<code>ExpiredJwtException</code> instead of a malformed-compact-string error), same WARN outcome.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Invalid registration body — ERROR (400)</h2></div>
+  <p class="step-note"><code>GlobalExceptionHandler.handleValidationExceptions</code> catches <code>MethodArgumentNotValidException</code>, thrown by <code>@Valid</code> when <code>UserRegistrationDto</code>'s <code>@Size</code> constraints fail. The response body and 400 status are byte-for-byte what they were before this week — <code>log.error(...)</code> was added <em>before</em> the existing <code>return</code>, nothing about the return changed.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console lines</div><pre>$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"ab","password":"123"}'
+{"password":"Password must be at least 6 characters long","username":"Username must be between 3 and 50 characters"}
+
+<span class="dim">2026-07-19 18:41:59.076</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.e.i.RequestLoggingInterceptor - API request POST /api/auth/register -> called register
+<span class="dim">2026-07-19 18:41:59.080</span> <span class="ERROR">ERROR</span> <span class="dim">[user=anonymous]</span> c.k.e.e.GlobalExceptionHandler - Validation failed: {password=Password must be at least 6 characters long, username=Username must be between 3 and 50 characters}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"ab","password":"123"}'</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Duplicate username — ERROR (409)</h2></div>
+  <p class="step-note"><code>UserServiceImpl.registerUser</code> throws <code>IllegalArgumentException("Username already exists")</code> when the username lookup finds a row; <code>GlobalExceptionHandler.handleIllegalArgument</code> catches it, logs, and returns the same 409 it always did. Reuses the username from step 02.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console lines</div><pre>$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}'
+{"error":"Username already exists"}
+
+<span class="dim">2026-07-19 18:41:59.090</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=anonymous]</span> c.k.e.i.RequestLoggingInterceptor - API request POST /api/auth/register -> called register
+<span class="dim">2026-07-19 18:41:59.096</span> <span class="ERROR">ERROR</span> <span class="dim">[user=anonymous]</span> c.k.e.e.GlobalExceptionHandler - Illegal argument: Username already exists</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week11_tester","password":"testpass123"}'</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Course that doesn't exist — ERROR (404), and MDC survives into the handler</h2></div>
+  <p class="step-note"><code>CourseService.getSectionsForCourse</code> throws <code>ResponseStatusException(NOT_FOUND, "Course not found")</code>; <code>GlobalExceptionHandler.handleResponseStatus</code> logs the resolved status and message, then returns the same 404 body as before. This request is authenticated (uses <code>$TOKEN</code> from step 03), so — unlike step 05's rejected request — it reaches the controller and its <span class="lvl debug">DEBUG</span> line, and the <span class="lvl error">ERROR</span> line that follows still carries <code>[user=week11_tester]</code>. MDC is set once per request by <code>JwtFilter</code> and stays attached through every subsequent log call on that thread, including ones several layers deeper in a <code>@RestControllerAdvice</code> — not just the controller method itself.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — request + matching console lines</div><pre>$ curl -s -X GET localhost:8080/api/courses/9999/sections \
+  -H "Authorization: Bearer $TOKEN"
+{"error":"Course not found"}
+
+<span class="dim">2026-07-19 18:42:03.119</span> <span class="DEBUG">DEBUG</span> <span class="dim">[user=week11_tester]</span> c.k.e.i.RequestLoggingInterceptor - API request GET /api/courses/9999/sections -> called getSections
+<span class="dim">2026-07-19 18:42:03.129</span> <span class="ERROR">ERROR</span> <span class="dim">[user=week11_tester]</span> c.k.e.e.GlobalExceptionHandler - Response status exception: 404 - Course not found</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X GET localhost:8080/api/courses/9999/sections \
+  -H "Authorization: Bearer $TOKEN"</pre>
+      <p>Any course id that doesn't exist in your local database works — the table is empty by default since there's no seed data and no create-endpoint (same as prior weeks), so almost any id will 404 this way without extra setup.</p>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">One carries forward from Week 10's guide because the underlying mechanism didn't change; the rest are new to this week.</p>
+
+<section class="step">
+  <div class="step-head"><h2>"Port 8080 was already in use" on startup <em>(carried forward)</em></h2></div>
+  <p class="step-note">Spring Boot's <code>APPLICATION FAILED TO START</code> banner. Cause: a previous run of this same app is still alive and holding the port.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find the process: <pre>lsof -nP -iTCP:8080 -sTCP:LISTEN</pre></li>
+        <li>Confirm it's the stale app: <pre>ps -p &lt;PID&gt; -o pid,ppid,etime,command</pre></li>
+        <li>Stop it: <pre>kill -15 &lt;PID&gt;</pre> then <pre>kill -9 &lt;PID&gt;</pre> if it's still listed a few seconds later.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: "I don't see DEBUG lines at all"</h2></div>
+  <p class="step-note">Two independent things both have to be true for a DEBUG line to appear, and it's easy to satisfy only one. First, the root logger in <code>logback-spring.xml</code> is deliberately set to <code>INFO</code> (so third-party libraries don't flood the console at DEBUG) — but there's a package-specific override, <code>&lt;logger name="com.kkalchake.enlightenment" level="DEBUG"/&gt;</code>, that raises it back up just for this app's own code. Second, <code>logback-spring.xml</code> has to actually be picked up: it lives at <code>src/main/resources/logback-spring.xml</code> and Spring Boot auto-detects that filename with zero explicit wiring — if you ever rename it to plain <code>logback.xml</code> alongside it or otherwise end up with two logging config files, Spring Boot's usual resolution order applies and can pick the wrong one.</p>
+  <details class="recreate">
+    <summary>How to check</summary>
+    <div class="body">
+      <ol>
+        <li>Confirm the file is where Spring Boot expects it: <pre>ls src/main/resources/logback-spring.xml</pre></li>
+        <li>Watch for the interceptor's own logger name specifically while replaying step 02 above: <pre>tail -f &lt;wherever mvnw's stdout is going&gt; | grep RequestLoggingInterceptor</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: no <code>DB_URL</code>/<code>DB_USERNAME</code>/<code>DB_PASSWORD</code> exports needed anymore</h2></div>
+  <p class="step-note">Earlier weeks' guides exported these three as env vars inline with <code>mvn spring-boot:run</code> because <code>application-dev.yaml</code> used to read them via <code>${DB_URL}</code>-style placeholders, and exporting on a separate shell line before <code>mvn</code> silently failed to reach the subprocess. That's no longer the shape of this file — the Postgres connection values are written in directly. If you copy an old command with the three exports from a prior week's guide it will still work (the exports are simply unused), but they're not required and this guide's Setup section above omits them.</p>
+  <details class="recreate">
+    <summary>How to check</summary>
+    <div class="body"><pre>grep -A4 'datasource:' src/main/resources/application-dev.yaml</pre>
+      <p>If <code>url</code> is a literal <code>jdbc:postgresql://...</code> string rather than <code>${DB_URL}</code>, no exports are needed.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: step 05's request gets no DEBUG line — that's expected, not a bug</h2></div>
+  <p class="step-note">If you're checking off this guide's steps against console output and step 05 seems to be "missing" its interceptor line compared to every other step, that's correct behavior, not something to debug further. Spring Security's filter chain (which includes <code>JwtFilter</code>) runs before <code>DispatcherServlet</code> ever resolves a handler method. A request that fails authentication gets rejected with 403 inside that filter chain and never reaches <code>RequestLoggingInterceptor.preHandle</code> at all — the WARN line from <code>JwtFilter</code> is the complete trace for that request, by design.</p>
+  <details class="recreate">
+    <summary>Where this is enforced</summary>
+    <div class="body">See <code>SecurityConfig.filterChain</code>'s <code>.anyRequest().authenticated()</code> and the filter ordering set by <code>.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)</code> — both predate this week's changes and were not touched by it.</div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

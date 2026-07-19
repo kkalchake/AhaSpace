@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Pulls in Spring Boot's default conversion rules/properties so patterns like %clr behave
+         consistently with Boot's own log lines (e.g. the startup banner) if ever added later. -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- %X{username:-anonymous} must match the MDC key "username" set by JwtFilter verbatim,
+                 otherwise it silently renders the default every time instead of erroring. -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [user=%X{username:-anonymous}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root stays at INFO so Spring Boot's own startup line ("Started Enlightenment in N
+         seconds") and other framework INFO logs still show without our app's DEBUG noise. -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <!-- Per-package override: without this, RequestLoggingInterceptor's DEBUG line would be
+         suppressed by the INFO root level above. -->
+    <logger name="com.kkalchake.enlightenment" level="DEBUG"/>
+</configuration>
