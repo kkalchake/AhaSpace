@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 10 — Local Validation</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+
+  .env-card { margin-top: 12px; font-size: 13.5px; }
+  .env-card .row { display: flex; gap: 10px; margin: 4px 0; }
+  .env-card .k { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); width: 90px; flex: none; padding-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 10 — Section-scoped AI chat assistant</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub">Every screenshot below is from an actual run against the live server and a real browser — not a description of what should happen. Runs against the same Postgres <code>dev</code> profile Week 9 set up (no new persistence profile this week, so there's only one environment to validate). Under each screenshot, expand <strong>Recreate this step</strong> for the exact commands to reproduce it yourself.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01</td><td>New tables created on startup</td><td><code>section_chat_sessions</code>, <code>section_chat_messages</code> exist</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02–03</td><td>New tables start empty</td><td>0 rows in both, before any chat happens</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">04–07</td><td>Seed a Course + 2 Sections (one with LaTeX)</td><td>Rows persist, one section contains <code>$x^2$</code>-style math</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08–09</td><td>Register + log in</td><td>201, then 200 with a real JWT</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">10</td><td>POST .../chat, new session</td><td>200, real Gemini answer, new <code>sessionId</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">11</td><td>POST .../chat, unknown section</td><td>404 <code>{"error":"Section not found"}</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">12–13</td><td>GET .../chat/sessions</td><td>200 with array · 403 unauthenticated</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">14–15</td><td>GET .../chat/sessions/{id}</td><td>200 for owner · 403 for a different user</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">16–17</td><td>Re-inspect the new tables</td><td>Stored <code>content</code> is the raw question/answer only, never the augmented prompt</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">18–21</td><td>Browser: register → login → /courses → sections</td><td>Real pages, real navigation</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">22</td><td>Open a section</td><td>Markdown headings/lists and KaTeX-rendered math both render</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">23–25</td><td>Ask the assistant, start a second thread, switch back</td><td>Two independent sessions, sidebar switching works</td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">This week touches both repositories. The backend needs the same Postgres container Week 9 introduced; the frontend needs three new npm packages for Markdown/LaTeX rendering that are already committed to <code>package.json</code>.</p>
+
+<details class="recreate setup">
+  <summary>Start the backend</summary>
+  <div class="body">
+    <ol>
+      <li>Kill any backend still holding port 8080 from a previous run — otherwise <code>mvn spring-boot:run</code> below fails with <code>APPLICATION FAILED TO START</code> (see Troubleshooting). Safe to run even if nothing is listening:
+        <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true</pre>
+      </li>
+      <li>Make sure the Postgres container is up (idempotent — safe whether it's already running or not):
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+      <li>Run the app with the <code>dev</code> profile, exporting the DB variables in the same command as <code>mvn</code> (see Week 9's troubleshooting notes below for why this matters):
+        <pre>DB_URL=jdbc:postgresql://localhost:5432/enlightenment \
+DB_USERNAME=ahaspace \
+DB_PASSWORD=ahaspace \
+mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+      </li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. In the startup log you should also see Hibernate create the two new tables:
+        <pre>Hibernate: create table section_chat_messages (id bigserial not null, content TEXT not null, created_at timestamp(6) not null, model varchar(255), role varchar(255) not null, session_id bigint not null, primary key (id))
+Hibernate: create table section_chat_sessions (id bigserial not null, created_at timestamp(6) not null, title varchar(255) not null, section_id bigint not null, user_id bigint not null, primary key (id))</pre>
+        This is <code>ddl-auto=update</code> at work again — same mechanism Week 9's <code>courses</code>/<code>sections</code> tables came from. <code>SectionChatSession</code>/<code>SectionChatMessage</code> are new JPA entities that mirror <code>ChatSession</code>/<code>ChatMessage</code> field-for-field (per decisions.md), so Hibernate generates their tables the same way, with two extra foreign keys this time: <code>section_chat_sessions.section_id → sections.id</code> and <code>.user_id → users.id</code>.
+      </li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the frontend</summary>
+  <div class="body">
+    <ol>
+      <li>From the frontend repo root:
+        <pre>cd AhaSpaceUI
+npm install
+npm run dev</pre>
+      </li>
+      <li><code>npm install</code> pulls in the four packages this week added to <code>package.json</code>: <code>react-markdown</code>, <code>remark-math</code>, <code>rehype-katex</code>, <code>katex</code>. If these were already installed by the implementation phase, this is a no-op.</li>
+      <li>Vite prints <code>Local: http://localhost:3000/</code> — <strong>not</strong> the Vite default of 5173. This project's <code>vite.config.js</code> pins <code>server.port: 3000</code> deliberately, because the backend's <code>SecurityConfig</code> CORS policy only allows <code>http://localhost:3000</code> as an origin. If you ever see CORS errors in the browser console, the first thing to check is whether the frontend actually came up on 3000.</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== DATA LAYER ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer</summary>
+<p class="group-intro">Same H2 web console Week 9 used, still pointed at the real Postgres container — the H2 console is a generic SQL client, not limited to H2 databases. First we confirm the new tables exist and start empty, then we seed the Course/Section prerequisite the chat endpoints need, using the same direct-SQL approach Week 9 used (there is still no create-endpoint for courses/sections — read-only APIs by design).</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>New tables created on startup</h2></div>
+  <p class="step-note">The schema tree now lists <strong>SECTION_CHAT_MESSAGES</strong> and <strong>SECTION_CHAT_SESSIONS</strong> alongside the existing <code>CHAT_MESSAGES</code>/<code>CHAT_SESSIONS</code> (the account-wide chat from an earlier week) and <code>COURSES</code>/<code>SECTIONS</code> (Week 9). Four separate chat-shaped tables now exist on purpose — decisions.md's chosen design keeps section-scoped chat as parallel entities rather than reusing/branching the existing <code>ChatSession</code>/<code>ChatMessage</code> tables, so the two features can't accidentally interfere with each other.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-schema-tree.png" alt="H2 console schema tree showing section_chat_sessions and section_chat_messages tables"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>With the backend running, open <code>http://localhost:8080/h2-console</code>.</li>
+        <li>Set <strong>Driver Class</strong> to <code>org.postgresql.Driver</code>, <strong>JDBC URL</strong> to <code>jdbc:postgresql://localhost:5432/enlightenment</code>, <strong>User Name</strong> to <code>ahaspace</code>, <strong>Password</strong> to <code>ahaspace</code>.</li>
+        <li>Click <strong>Connect</strong>. The left tree lists every table that exists right now.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>section_chat_sessions starts empty</h2></div>
+  <p class="step-note">Zero rows, because no one has asked a section a question yet.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/02-section-chat-sessions-empty.png" alt="SELECT * FROM section_chat_sessions, 0 rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM section_chat_sessions;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>section_chat_messages starts empty</h2></div>
+  <p class="step-note">Same story for the message table.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/03-section-chat-messages-empty.png" alt="SELECT * FROM section_chat_messages, 0 rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM section_chat_messages;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Insert a Course</h2></div>
+  <p class="step-note">A second course, <strong>Calculus Basics</strong>, inserted alongside Week 9's <em>Intro to Algebra</em>. The chat endpoints need a real <code>Section</code> to attach to, and this course's sections are written specifically to exercise this week's rendering pipeline — one plain-Markdown section, one with an actual LaTeX expression in it.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/04-insert-course.png" alt="H2 console after inserting the Calculus Basics course"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>INSERT INTO courses (title, description) VALUES
+  ('Calculus Basics', 'Limits, derivatives, and the power rule.');</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Verify the Course row, note its id</h2></div>
+  <p class="step-note">Got id <code>2</code> in this guide's own run, because Week 9's algebra course was still sitting at id <code>1</code> in that database. <strong>Your id may differ</strong> — if this is a fresh Postgres volume (e.g. <code>docker compose down -v</code> was ever run), or Week 9 wasn't run first in this container, Calculus Basics lands at id <code>1</code> instead. Step 06 below no longer hardcodes the id for this reason (it looks the course up by title), but every <code>curl</code> command from step 10 onward still needs the real numeric id, captured as a shell variable in step 07.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/05-select-courses.png" alt="SELECT * FROM courses showing both courses"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM courses;</pre><p>Note whatever id the <strong>Calculus Basics</strong> row actually got.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Insert two Sections</h2></div>
+  <p class="step-note">Both reference the Calculus Basics course by looking its id up with a subquery instead of a hardcoded number — this is what step 05 flagged: whatever numeric id that course actually got, this <code>INSERT</code> finds it correctly rather than assuming <code>2</code>. (A hardcoded <code>2</code> is what caused a foreign-key violation in an earlier version of this guide when the course landed at id <code>1</code> instead.) The second section's <code>content</code> deliberately contains a block-level LaTeX expression (<code>$$f'(x) = nx^{n-1}$$</code>) and an inline one (<code>$f(x) = x^2$</code>) — this is the content step 22 later proves actually renders as real math in the browser, not literal dollar signs.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/06-insert-sections.png" alt="H2 console after inserting two section rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>INSERT INTO sections (content, course_id) VALUES
+  ('# Introduction to Calculus
+
+Calculus studies **rates of change** and **accumulation** of quantities. The two foundational operations are:
+
+- Differentiation
+- Integration
+
+We start with differentiation.', (SELECT id FROM courses WHERE title = 'Calculus Basics'));
+
+INSERT INTO sections (content, course_id) VALUES
+  ('# The Power Rule
+
+For a function $f(x) = x^n$, the derivative is given by:
+
+$$f''(x) = nx^{n-1}$$
+
+For example, if $f(x) = x^2$, then $f''(x) = 2x$. This rule extends to any real exponent $n$.', (SELECT id FROM courses WHERE title = 'Calculus Basics'));</pre>
+      <p>Note the doubled <code>''</code> inside the SQL string literal — that's SQL's own escape for a single quote character, not a typo. It's what makes <code>f'(x)</code> show up correctly once the row is read back.</p>
+      <p>The <code>(SELECT id FROM courses WHERE title = 'Calculus Basics')</code> subquery runs once per <code>INSERT</code> and substitutes whatever id that course row actually has — this only works because <code>title</code> is unique in this seed data, not because of any database constraint enforcing it.</p>
+      </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Verify both Sections, note their ids</h2></div>
+  <p class="step-note">Section <code>3</code> is the plain-Markdown one, section <code>4</code> is the math-heavy one, in this guide's own run — <code>sectionId=4</code> is what every chat call below targets, and what step 22's browser screenshot opens. Your ids may differ (see step 05), so capture the real values into shell variables now rather than tracking substitutions by hand for the rest of this guide.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/07-select-sections.png" alt="SELECT id, course_id, content FROM sections WHERE course_id = 2"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT id, course_id, content FROM sections WHERE course_id = (SELECT id FROM courses WHERE title = 'Calculus Basics');</pre>
+      <p>In the terminal where you'll run the <code>curl</code> commands below, set:</p>
+      <pre>COURSE_ID=&lt;the course_id column from the result above&gt;
+SECTION_ID=&lt;the id of the second row — the one with the LaTeX content&gt;</pre>
+      <p>Every <code>curl</code> command from step 10 onward uses <code>$COURSE_ID</code>/<code>$SECTION_ID</code> instead of a hardcoded number, so it works regardless of what this database actually assigned.</p>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== AUTH ============================== -->
+<details class="group" open>
+<summary class="group-label">Auth-gated flow</summary>
+<p class="group-intro">Identical mechanism to Week 9 — same <code>/api/auth/register</code> and <code>/api/auth/login</code> endpoints, same JWT scheme, nothing about auth changed this week. Two accounts are created here on purpose: <code>week10_tester</code> owns every session created below, and <code>week10_tester2</code> exists purely to prove the ownership check in step 15 (a session created by one user is invisible to another, even with a valid token).</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Register two test users</h2></div>
+  <p class="step-note"><code>POST /api/auth/register</code> — run twice, once per username. Response shown is for the first call; the second is identical apart from the username in the request body.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/08-register.png" alt="POST /api/auth/register response, 201 Created"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week10_tester","password":"testpass123"}'
+
+curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week10_tester2","password":"testpass123"}'</pre>
+      <p>Pick usernames you haven't used before — registering the same one twice fails.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>Log in and capture both JWTs</h2></div>
+  <p class="step-note"><code>POST /api/auth/login</code> for each user. <code>$TOKEN</code> (week10_tester) is the Authorization header for every "success" and "owner" call below; <code>$TOKEN2</code> (week10_tester2) is only used in step 15, to demonstrate the 403.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/09-login.png" alt="POST /api/auth/login response, 200 with token"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week10_tester","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+TOKEN2=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week10_tester2","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")</pre>
+      <p>Week 9's guide already documents this exact register/login/JWT pattern in full — this step just reuses it against two new usernames rather than re-deriving the mechanism.</p>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINTS ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: POST /chat</summary>
+<p class="group-intro"><code>SectionChatController</code> at <code>/api/courses/{courseId}/sections/{sectionId}/chat</code> — <code>courseId</code> is only in the URL for consistency with the frontend's route nesting, the actual lookup is keyed on <code>sectionId</code> alone. The try/catch ordering inside the controller is copied verbatim from the existing <code>ChatController</code>: a <code>ResponseStatusException</code> keeps its own status, an <code>IllegalStateException</code> (thrown by <code>GeminiProvider</code> when the API key is blank) becomes 500, and any other <code>RuntimeException</code> from the AI call becomes 400.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>Success — new session, real Gemini answer</h2></div>
+  <p class="step-note"><code>sessionId: null</code> tells <code>SectionChatService.processMessage</code> to create a brand-new <code>SectionChatSession</code> rather than append to an existing one. The response's <code>sessionTitle</code> is the first 50 characters of the question (<code>buildTitle</code>, same truncation rule as the account-wide chat) plus <code>"..."</code> since the question ran past 50 characters. The <code>response</code> text is a genuine Gemini API call, not a stub — this is the actual model answering a question about the exact section content seeded in step 06.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/10-chat-success.png" alt="POST chat success, 200 with real Gemini response"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is the derivative of x^2 according to the power rule?","sessionId":null}'</pre>
+      <p>Needs a real <code>gemini.api.key</code> configured in <code>application-dev.yaml</code> (see Troubleshooting below) — without one this returns 500 instead.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>Failure — section does not exist</h2></div>
+  <p class="step-note">404 with <code>{"error":"Section not found"}</code>. This is the very first thing <code>processMessage</code> does — <code>sectionRepository.findById(sectionId).orElseThrow(...)</code> — before it ever touches a session, a user lookup, or the AI provider. A bad <code>sectionId</code> fails fast, before any database write happens.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/11-chat-404-section.png" alt="POST chat, unknown section, 404 Section not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/courses/$COURSE_ID/sections/9999/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"Does this section exist?","sessionId":null}'</pre></div>
+  </details>
+</section>
+
+</details>
+
+<details class="group" open>
+<summary class="group-label">Endpoint: GET /chat/sessions</summary>
+<p class="group-intro">Lists every session <em>this user</em> has on <em>this section</em> — the query is <code>findByUserUsernameAndSectionIdOrderByCreatedAtDesc</code>, filtered on both fields at once. That's the mechanism behind "multiple named chat threads per (user, section)" from decisions.md: nothing stops the same user from starting several independent conversations about one section, and nothing lets that list leak into a different section or a different user's sessions.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>Success</h2></div>
+  <p class="step-note">One entry — the session step 10 just created. Only <code>id</code>, <code>title</code>, <code>createdAt</code> come back; the full message list is a separate call (step 14), so opening a section doesn't force-load every message in every one of its threads.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/12-sessions-success.png" alt="GET chat sessions, 200 with one session"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat/sessions \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">13</span><h2>Failure — no Authorization header</h2></div>
+  <p class="step-note">403 with an empty body. Same behavior Week 9 documented for <code>/api/courses</code>: this app's Spring Security config has no custom <code>AuthenticationEntryPoint</code>, so the default unauthenticated response is 403, not 401. <code>SecurityConfig</code>'s <code>anyRequest().authenticated()</code> covers these new nested <code>/api/courses/**</code> paths automatically — no security config change was needed for this feature.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/13-sessions-403-unauthenticated.png" alt="GET chat sessions, no auth header, 403"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat/sessions</pre></div>
+  </details>
+</section>
+
+</details>
+
+<details class="group" open>
+<summary class="group-label">Endpoint: GET /chat/sessions/{sessionId}</summary>
+<p class="group-intro">Returns one session's full message history. Three checks happen in order before any data comes back: the session must exist, the caller must own it, and the session must actually belong to the <code>sectionId</code> in the URL (guards against reusing a session id that's valid but for a different section). This step exercises the ownership check specifically.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">14</span><h2>Success — the session's owner</h2></div>
+  <p class="step-note">Two messages: the user's raw question, then the assistant's answer. Note <code>model</code> is <code>null</code> on the user message and <code>"gemini-2.5-flash-lite"</code> on the assistant message — only replies carry a model name, since only replies came from the model.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/14-session-detail-success.png" alt="GET session detail, 200, two messages"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat/sessions/1 \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool</pre>
+      <p>Use whatever <code>sessionId</code> step 10's response actually returned if it isn't <code>1</code>.</p></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">15</span><h2>Failure — a different user's token</h2></div>
+  <p class="step-note">403 with <code>{"error":"Access denied"}</code>. Same session id as step 14, but requested with <code>$TOKEN2</code> (week10_tester2) instead of the session's actual owner. <code>SectionChatService</code> compares <code>session.getUser().getUsername()</code> against <code>Authentication.getName()</code> and throws before any message data is returned — a valid JWT alone isn't enough, it has to be <em>this</em> session's own user.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/15-session-detail-403-wrong-owner.png" alt="GET session detail, wrong owner, 403 Access denied"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/courses/$COURSE_ID/sections/$SECTION_ID/chat/sessions/1 \
+  -H "Authorization: Bearer $TOKEN2" | python3 -m json.tool</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== DATA LAYER REVISITED ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer, revisited</summary>
+<p class="group-intro">This is the check that actually proves decisions.md's most important constraint: <strong>"<code>SectionChatMessage.content</code> stores only the raw user question; the section's content is spliced into the LLM prompt only at call-time, never persisted."</strong> Everything above exercised the API surface — this goes straight to the database to confirm what got written.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">16</span><h2>section_chat_sessions, now with one row</h2></div>
+  <p class="step-note">The session created in step 10, owned by <code>week10_tester</code>'s <code>user_id</code>, pointing at <code>section_id = 4</code>.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/16-section-chat-sessions-populated.png" alt="SELECT * FROM section_chat_sessions, one row"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT * FROM section_chat_sessions;</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">17</span><h2>section_chat_messages — the content column is the tell</h2></div>
+  <p class="step-note">Row 1's <code>content</code> is exactly <code>"What is the derivative of x^2 according to the power rule?"</code> — the raw question, character for character. It is <strong>not</strong> <code>"Section content:\n# The Power Rule...\n\nQuestion: What is the derivative..."</code>, which is what <code>SectionChatService</code> actually sent to Gemini. That augmented string is built fresh inside <code>processMessage</code>, passed straight to <code>aiProvider.chat(prompt)</code>, and never saved anywhere — only the pre-augmentation question and the model's answer get written to the table. This is why re-opening an old thread later doesn't re-send the whole section content to Gemini again on every render; it only happens once, at the moment a question is actually asked.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/17-section-chat-messages-populated.png" alt="SELECT id, session_id, role, content, model FROM section_chat_messages, two rows"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT id, session_id, role, content, model FROM section_chat_messages ORDER BY id;</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FRONTEND ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend</summary>
+<p class="group-intro">Real browser screenshots (headless Chromium via Playwright, screenshotted at each step) driving the actual React app — not a description of the components. A fresh account, <code>week10_browser</code>, is used here so its session sidebar starts empty and both threads created below are visibly new.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">18</span><h2>Register in the browser</h2></div>
+  <p class="step-note"><code>Register.jsx</code> posts to the same <code>/api/auth/register</code> endpoint exercised via curl in step 08, then redirects to <code>/?success=true</code> on 201.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/18-ui-register-success.png" alt="Home page after successful registration"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Open <code>http://localhost:3000/register</code>.</li>
+        <li>Fill in a username and a password (6+ characters) and click <strong>Register</strong>.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">19</span><h2>Log in</h2></div>
+  <p class="step-note"><code>AuthContext</code> stores the JWT from the login response and every subsequent fetch (courses, sections, chat) reads it back out as an <code>Authorization: Bearer</code> header — the same JWT mechanism as the curl flow above, just held in React state/localStorage instead of a shell variable.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/19-ui-dashboard-after-login.png" alt="Home page after login, showing AI Chat, Courses, Logout buttons"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Open <code>http://localhost:3000/login</code>.</li>
+        <li>Sign in with the account from step 18.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">20</span><h2>/courses</h2></div>
+  <p class="step-note"><code>CourseList.jsx</code> — GETs <code>/api/courses</code> on mount, same endpoint and same shape (<code>id</code>/<code>title</code>/<code>description</code>) as Week 9. Both seeded courses show up, since nothing this week touches course visibility.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/20-ui-courses-list.png" alt="Courses list page showing Intro to Algebra and Calculus Basics"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click <strong>Courses</strong> on the home page, or navigate directly to <code>http://localhost:3000/courses</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">21</span><h2>Drill into a course's sections</h2></div>
+  <p class="step-note"><code>CourseSections.jsx</code> — GETs <code>/api/courses/2/sections</code>. Sections have no <code>title</code> field in the backend model, so the page labels them "Section 1"/"Section 2" by list position and shows a truncated snippet of the raw Markdown as a stand-in description — that's why the snippet still shows literal <code>#</code> and <code>$...$</code> characters here, unrendered. Rendering only happens one level deeper, inside the section itself.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/21-ui-course-sections.png" alt="Sections list for Calculus Basics, showing two sections with raw Markdown snippets"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click <strong>Calculus Basics</strong> from the courses list.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">22</span><h2>Open a section — Markdown and LaTeX both render</h2></div>
+  <p class="step-note"><code>SectionView.jsx</code>'s left pane runs the section's <code>content</code> through <code>&lt;ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}&gt;</code> — no <code>dangerouslySetInnerHTML</code> anywhere (confirmed during Phase 6 verification). <code>remark-math</code> recognizes the <code>$...$</code>/<code>$$...$$</code> delimiters in the Markdown AST, <code>rehype-katex</code> turns the math nodes it finds into real KaTeX-rendered equations, and <code>katex/dist/katex.min.css</code> (imported once at the top of this file) supplies the fonts/spacing that make it look like typeset math instead of plain text. The heading, bold text, and the block-level <code>$$f'(x) = nx^{n-1}$$</code> equation are all rendering correctly here — this is the actual proof that the LaTeX pipeline works, not just that the libraries are installed.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/22-ui-section-markdown-latex.png" alt="Section view showing rendered Markdown heading and KaTeX-rendered power rule equation"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click <strong>Section 2</strong> ("The Power Rule") from the sections list — this is the section seeded with LaTeX in step 06.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">23</span><h2>Ask the assistant — first thread</h2></div>
+  <p class="step-note"><code>SectionAssistantPanel.jsx</code> only ever mounts inside <code>SectionView</code> — there's no standalone route for it, which is what satisfies "the assistant appears only on a section content page" from decisions.md. Typing a question and sending it POSTs to <code>/api/courses/2/sections/4/chat</code> with <code>sessionId: null</code> (same request shape as step 10's curl call), and the real Gemini reply renders through the same <code>ReactMarkdown</code>+KaTeX pipeline as the lecture-notes pane on the left — visible here as a properly typeset exponent in the assistant's reply, not a raw <code>^</code> character.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/23-ui-assistant-response-thread1.png" alt="Section assistant panel showing a question and a real rendered Gemini answer with math"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>In the right-hand panel, type a question about the section, e.g. <em>"Give me another example of the power rule"</em>.</li>
+        <li>Click <strong>Send</strong> and wait a few seconds for the real API round trip.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">24</span><h2>Start a second, independent thread</h2></div>
+  <p class="step-note">Clicking <strong>+ New Chat</strong> just clears local component state (<code>activeSessionId</code> back to <code>null</code>, <code>messages</code> back to <code>[]</code>) — it doesn't call the backend by itself. The next message sent with <code>sessionId: null</code> is what actually creates the second <code>SectionChatSession</code> row server-side. The sidebar now lists both threads, newest first (<code>findByUserUsernameAndSectionIdOrderByCreatedAtDesc</code>), each labeled with its own truncated first-question title.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/24-ui-assistant-response-thread2.png" alt="Second chat thread on the same section, sidebar showing both threads"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Click <strong>+ New Chat</strong> in the sidebar.</li>
+        <li>Ask a different question, e.g. <em>"What is calculus used for?"</em>, and send it.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">25</span><h2>Switch back to the first thread</h2></div>
+  <p class="step-note">Clicking the first thread's entry in the sidebar calls <code>handleSelectSession</code>, which GETs <code>/api/courses/2/sections/4/chat/sessions/{id}</code> (same endpoint and response shape as step 14) and replaces the local <code>messages</code> array with that session's actual saved history. The highlighted sidebar entry moves, and thread 1's original question and answer reappear exactly as sent — proving the two threads are genuinely independent conversations, not one shared history being relabeled.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/25-ui-switch-back-thread1.png" alt="Switched back to the first thread, showing its original messages and the active sidebar entry"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click the first thread's entry (the one from step 23) in the sidebar.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== COMMON ERRORS ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">Two of these carry forward from Week 9's guide because nothing about the underlying mechanism changed; two are new to this week.</p>
+
+<section class="step">
+  <div class="step-head"><h2>"Port 8080 was already in use" on startup <em>(carried forward from Week 9)</em></h2></div>
+  <p class="step-note">Spring Boot's <code>APPLICATION FAILED TO START</code> banner. Cause: a previous run of this same app is still alive and holding the port.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find the process: <pre>lsof -nP -iTCP:8080 -sTCP:LISTEN</pre></li>
+        <li>Confirm it's the stale app: <pre>ps -p &lt;PID&gt; -o pid,ppid,etime,command</pre></li>
+        <li>Stop it: <pre>kill -15 &lt;PID&gt;</pre> then <pre>kill -9 &lt;PID&gt;</pre> if it's still listed a few seconds later.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Postgres <code>dev</code> profile: driver error mentioning <code>${DB_URL}</code> literally <em>(carried forward from Week 9)</em></h2></div>
+  <p class="step-note">Happens if the three <code>DB_*</code> variables are exported on a separate shell line before running <code>mvn</code>, instead of inline on the same command — the export doesn't reach the <code>mvn</code> subprocess, so <code>application-dev.yaml</code>'s <code>${DB_URL}</code> placeholder is never resolved.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <pre>DB_URL=jdbc:postgresql://localhost:5432/enlightenment \
+DB_USERNAME=ahaspace \
+DB_PASSWORD=ahaspace \
+mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+      <p>All three variables and the <code>mvn</code> invocation on one logical command, exactly as shown in Setup above.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: Gemini returns 503 "high demand" mid-session</h2></div>
+  <p class="step-note">Hit while capturing screenshots for this guide: two consecutive real calls to <code>gemini-2.5-flash-lite</code> failed with <code>503 Service Unavailable</code>, logged by <code>GeminiProvider</code> as <code>"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."</code> This is Google's infrastructure, not application code — <code>SectionChatController</code>'s catch-all <code>RuntimeException → 400 "Failed to get AI response"</code> path handled it correctly (same path a genuinely bad request would hit), it just isn't the response a user actually wants to see for a transient upstream outage.</p>
+  <details class="recreate">
+    <summary>What actually resolved it</summary>
+    <div class="body">
+      <ol>
+        <li>Waited roughly 8 seconds and retried the same request — five consecutive retries all came back 200.</li>
+        <li>No code change was needed to reproduce a working demo; this is documented here so it isn't mistaken for an application bug if you hit it while working through this guide yourself. If it becomes a recurring problem, retry/backoff logic inside <code>GeminiProvider</code> would be the place to add it — out of scope for this week's decisions.md.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>New: chat endpoints 404 until a Course + Section exist</h2></div>
+  <p class="step-note">The section-scoped chat endpoints have no meaning without a real <code>Section</code> row to attach to — there's no seed data shipped with the app, and no create-endpoint for courses/sections (by design, same as Week 9). Trying to exercise steps 10–17 before doing the Data Layer steps above just produces the same 404 as step 11's deliberate failure case, which can be confusing if you don't yet know that's expected.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">Do the Data layer steps (04–07) first, in order, before touching any <code>/chat</code> endpoint. That's why this guide is sequenced the way it is rather than jumping straight to the new endpoints.</div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
