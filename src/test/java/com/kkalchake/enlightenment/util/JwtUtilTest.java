@@ -29,20 +29,20 @@ class JwtUtilTest {
     }
 
     @Test
-    void extractUsername_shouldReturnCorrectUsername() {
+    void extractEmail_shouldReturnCorrectEmail() {
         String token = jwtUtil.generateToken("jane");
-        String username = jwtUtil.extractUsername(token);
-        assertEquals("jane", username);
+        String email = jwtUtil.extractEmail(token);
+        assertEquals("jane", email);
     }
 
     @Test
-    void validateToken_withCorrectUsername_shouldReturnTrue() {
+    void validateToken_withCorrectEmail_shouldReturnTrue() {
         String token = jwtUtil.generateToken("john");
         assertTrue(jwtUtil.validateToken(token, "john"));
     }
 
     @Test
-    void validateToken_withWrongUsername_shouldReturnFalse() {
+    void validateToken_withWrongEmail_shouldReturnFalse() {
         String token = jwtUtil.generateToken("john");
         assertFalse(jwtUtil.validateToken(token, "jane"));
     }
@@ -54,6 +54,6 @@ class JwtUtilTest {
 
     @Test
     void validateToken_shouldThrowExceptionForMalformedToken() {
-        assertThrows(JwtException.class, () -> jwtUtil.extractUsername("bad-token"));
+        assertThrows(JwtException.class, () -> jwtUtil.extractEmail("bad-token"));
     }
 }

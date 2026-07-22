@@ -38,30 +38,38 @@ class AuthControllerTest {
     void register_success() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"john\",\"password\":\"password123\"}"))
+                .content("{\"email\":\"john@example.com\",\"password\":\"password123\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("User registered successfully"));
     }
 
     @Test
-    void register_validationError() throws Exception {
+    void register_validationError_shortPassword() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"ab\",\"password\":\"pass\"}"))
+                .content("{\"email\":\"john@example.com\",\"password\":\"pass\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_validationError_invalidEmail() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\",\"password\":\"password123\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void login_success() throws Exception {
         when(userService.verifyUser(any(UserLoginDto.class))).thenReturn(true);
-        when(jwtUtil.generateToken("john")).thenReturn("test-token-123");
+        when(jwtUtil.generateToken("john@example.com")).thenReturn("test-token-123");
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"john\",\"password\":\"password123\"}"))
+                .content("{\"email\":\"john@example.com\",\"password\":\"password123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("test-token-123"))
-                .andExpect(jsonPath("$.username").value("john"));
+                .andExpect(jsonPath("$.email").value("john@example.com"));
     }
 
     @Test
@@ -70,16 +78,24 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"john\",\"password\":\"wrongpass\"}"))
+                .content("{\"email\":\"john@example.com\",\"password\":\"wrongpass\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("Invalid username or password"));
+                .andExpect(jsonPath("$.error").value("Invalid email or password"));
     }
 
     @Test
-    void login_validationError_blankUsername() throws Exception {
+    void login_validationError_blankEmail() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"\",\"password\":\"pass\"}"))
+                .content("{\"email\":\"\",\"password\":\"pass\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void login_validationError_invalidEmailFormat() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\",\"password\":\"pass\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -91,10 +107,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "testuser")
+    @WithMockUser(username = "testuser@example.com")
     void me_success() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("testuser"));
+                .andExpect(jsonPath("$.email").value("testuser@example.com"));
     }
 }

@@ -32,15 +32,15 @@ public class JwtFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                String username = jwtUtil.extractUsername(token);
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                String email = jwtUtil.extractEmail(token);
+                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(username, null, List.of());
+                            new UsernamePasswordAuthenticationToken(email, null, List.of());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    // Sole producer of the "username" MDC key; the Logback pattern's
-                    // %X{username:-anonymous} token reads it back per log line on this thread.
-                    MDC.put("username", username);
+                    // Sole producer of the "email" MDC key; the Logback pattern's
+                    // %X{email:-anonymous} token reads it back per log line on this thread.
+                    MDC.put("email", email);
                 }
             } catch (Exception e) {
                 // Continue unauthenticated rather than failing the request; WARN keeps
@@ -54,7 +54,7 @@ public class JwtFilter extends OncePerRequestFilter {
         } finally {
             // Servlet container threads are pooled and reused across unrelated requests;
             // without clearing, a later request on the same thread could inherit this
-            // request's username in its log lines.
+            // request's email in its log lines.
             MDC.clear();
         }
     }

@@ -37,7 +37,7 @@ class ChatServiceTest {
 
         testUser = new User();
         testUser.setId(1L);
-        testUser.setUsername("testuser");
+        testUser.setEmail("testuser");
         testUser.setPasswordHash("hash");
 
         savedSession = new ChatSession();
@@ -48,7 +48,7 @@ class ChatServiceTest {
 
     @Test
     void processMessage_newSession_createsSessionAndPersistsMessages() {
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(chatSessionRepository.save(any())).thenReturn(savedSession);
         when(chatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat("Hello AI")).thenReturn("AI says hi");
@@ -74,7 +74,7 @@ class ChatServiceTest {
         sessionWithTruncatedTitle.setTitle(expectedTitle);
         sessionWithTruncatedTitle.setUser(testUser);
 
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(chatSessionRepository.save(any())).thenReturn(sessionWithTruncatedTitle);
         when(chatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(anyString())).thenReturn("response");
@@ -102,7 +102,7 @@ class ChatServiceTest {
     @Test
     void processMessage_existingSession_wrongOwner_throwsForbidden() {
         User otherUser = new User();
-        otherUser.setUsername("otheruser");
+        otherUser.setEmail("otheruser");
         ChatSession otherSession = new ChatSession();
         otherSession.setId(7L);
         otherSession.setUser(otherUser);
@@ -125,7 +125,7 @@ class ChatServiceTest {
 
     @Test
     void processMessage_aiProviderThrows_propagatesException() {
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(chatSessionRepository.save(any())).thenReturn(savedSession);
         when(chatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(any())).thenThrow(new RuntimeException("API error"));
@@ -148,7 +148,7 @@ class ChatServiceTest {
         s2.setUser(testUser);
         s2.setCreatedAt(LocalDateTime.now());
 
-        when(chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc("testuser"))
+        when(chatSessionRepository.findByUserEmailOrderByCreatedAtDesc("testuser"))
                 .thenReturn(List.of(s1, s2));
 
         List<ChatSessionSummaryDto> result = chatService.getSessions("testuser");
@@ -160,7 +160,7 @@ class ChatServiceTest {
 
     @Test
     void getSessions_emptyList() {
-        when(chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc("testuser"))
+        when(chatSessionRepository.findByUserEmailOrderByCreatedAtDesc("testuser"))
                 .thenReturn(List.of());
 
         assertTrue(chatService.getSessions("testuser").isEmpty());
@@ -204,7 +204,7 @@ class ChatServiceTest {
     @Test
     void getSession_wrongOwner_throwsForbiddenException() {
         User other = new User();
-        other.setUsername("otheruser");
+        other.setEmail("otheruser");
         ChatSession otherSession = new ChatSession();
         otherSession.setId(2L);
         otherSession.setUser(other);

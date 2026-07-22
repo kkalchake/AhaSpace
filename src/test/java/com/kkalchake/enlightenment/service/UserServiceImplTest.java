@@ -32,10 +32,10 @@ class UserServiceImplTest {
     @Test
     void registerUser_success() {
         UserRegistrationDto dto = new UserRegistrationDto();
-        dto.setUsername("newuser");
+        dto.setEmail("newuser@example.com");
         dto.setPassword("password123");
 
-        when(userRepository.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("newuser@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("password123")).thenReturn("hashedPassword");
 
         userService.registerUser(dto);
@@ -44,12 +44,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    void registerUser_duplicateUsername_throwsException() {
+    void registerUser_duplicateEmail_throwsException() {
         UserRegistrationDto dto = new UserRegistrationDto();
-        dto.setUsername("existing");
+        dto.setEmail("existing@example.com");
         dto.setPassword("password123");
 
-        when(userRepository.findByUsername("existing")).thenReturn(Optional.of(new User()));
+        when(userRepository.findByEmail("existing@example.com")).thenReturn(Optional.of(new User()));
 
         assertThrows(IllegalArgumentException.class, () -> userService.registerUser(dto));
         verify(userRepository, never()).save(any());
@@ -58,14 +58,14 @@ class UserServiceImplTest {
     @Test
     void verifyUser_success() {
         UserLoginDto dto = new UserLoginDto();
-        dto.setUsername("john");
+        dto.setEmail("john@example.com");
         dto.setPassword("secret");
 
         User user = new User();
-        user.setUsername("john");
+        user.setEmail("john@example.com");
         user.setPasswordHash("hashedSecret");
 
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "hashedSecret")).thenReturn(true);
 
         assertTrue(userService.verifyUser(dto));
@@ -74,13 +74,13 @@ class UserServiceImplTest {
     @Test
     void verifyUser_wrongPassword() {
         UserLoginDto dto = new UserLoginDto();
-        dto.setUsername("john");
+        dto.setEmail("john@example.com");
         dto.setPassword("wrong");
 
         User user = new User();
         user.setPasswordHash("hashedSecret");
 
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashedSecret")).thenReturn(false);
 
         assertFalse(userService.verifyUser(dto));
@@ -89,23 +89,11 @@ class UserServiceImplTest {
     @Test
     void verifyUser_userNotFound() {
         UserLoginDto dto = new UserLoginDto();
-        dto.setUsername("unknown");
+        dto.setEmail("unknown@example.com");
         dto.setPassword("password");
 
-        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
         assertFalse(userService.verifyUser(dto));
-    }
-
-    @Test
-    void findByUsername_success() {
-        User user = new User();
-        user.setUsername("john");
-
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
-
-        Optional<User> result = userRepository.findByUsername("john");
-        assertTrue(result.isPresent());
-        assertEquals("john", result.get().getUsername());
     }
 }

@@ -22,22 +22,22 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(String username) {
+    public String generateToken(String email) {
         return Jwts.builder()
-                .subject(username)
+                .subject(email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
     }
 
-    public String extractUsername(String token) {
+    public String extractEmail(String token) {
         return parseToken(token).getPayload().getSubject();
     }
 
-    public boolean validateToken(String token, String username) {
+    public boolean validateToken(String token, String email) {
         try {
-            return extractUsername(token).equals(username) && !isTokenExpired(token);
+            return extractEmail(token).equals(email) && !isTokenExpired(token);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }

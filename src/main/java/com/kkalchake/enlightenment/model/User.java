@@ -17,8 +17,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // NOT NULL from day one, not added as a nullable column then backfilled:
+    // the dev DB has no rows yet (ddl-auto: update creates the table fresh),
+    // so there's no existing data that would violate the constraint on migration.
     @Column(unique = true, nullable = false)
-    private String username;
+    private String email;
 
     @Column(nullable = false)
     private String passwordHash;

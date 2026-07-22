@@ -34,7 +34,7 @@ class SectionChatSessionRepositoryTest {
     @BeforeEach
     void setUp() {
         testUser = new User();
-        testUser.setUsername("testuser");
+        testUser.setEmail("testuser@example.com");
         testUser.setPasswordHash("hash");
         testUser = userRepository.save(testUser);
 
@@ -49,7 +49,7 @@ class SectionChatSessionRepositoryTest {
     }
 
     @Test
-    void findByUserUsernameAndSectionIdOrderByCreatedAtDesc_returnsSessions() {
+    void findByUserEmailAndSectionIdOrderByCreatedAtDesc_returnsSessions() {
         SectionChatSession s1 = new SectionChatSession();
         s1.setUser(testUser);
         s1.setSection(testSection);
@@ -63,18 +63,18 @@ class SectionChatSessionRepositoryTest {
         sectionChatSessionRepository.save(s2);
 
         List<SectionChatSession> result = sectionChatSessionRepository
-                .findByUserUsernameAndSectionIdOrderByCreatedAtDesc("testuser", testSection.getId());
+                .findByUserEmailAndSectionIdOrderByCreatedAtDesc("testuser@example.com", testSection.getId());
         assertEquals(2, result.size());
         result.forEach(s -> {
-            assertEquals("testuser", s.getUser().getUsername());
+            assertEquals("testuser@example.com", s.getUser().getEmail());
             assertEquals(testSection.getId(), s.getSection().getId());
         });
     }
 
     @Test
-    void findByUserUsernameAndSectionIdOrderByCreatedAtDesc_differentUser_returnsEmpty() {
+    void findByUserEmailAndSectionIdOrderByCreatedAtDesc_differentUser_returnsEmpty() {
         User other = new User();
-        other.setUsername("otheruser");
+        other.setEmail("otheruser@example.com");
         other.setPasswordHash("hash");
         userRepository.save(other);
 
@@ -85,12 +85,12 @@ class SectionChatSessionRepositoryTest {
         sectionChatSessionRepository.save(s);
 
         List<SectionChatSession> result = sectionChatSessionRepository
-                .findByUserUsernameAndSectionIdOrderByCreatedAtDesc("testuser", testSection.getId());
+                .findByUserEmailAndSectionIdOrderByCreatedAtDesc("testuser@example.com", testSection.getId());
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void findByUserUsernameAndSectionIdOrderByCreatedAtDesc_differentSection_returnsEmpty() {
+    void findByUserEmailAndSectionIdOrderByCreatedAtDesc_differentSection_returnsEmpty() {
         // Same user, but a session tied to a second section must not show up when querying the first
         Section otherSection = new Section();
         otherSection.setContent("Other section content");
@@ -104,7 +104,7 @@ class SectionChatSessionRepositoryTest {
         sectionChatSessionRepository.save(s);
 
         List<SectionChatSession> result = sectionChatSessionRepository
-                .findByUserUsernameAndSectionIdOrderByCreatedAtDesc("testuser", testSection.getId());
+                .findByUserEmailAndSectionIdOrderByCreatedAtDesc("testuser@example.com", testSection.getId());
         assertTrue(result.isEmpty());
     }
 

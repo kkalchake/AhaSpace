@@ -6,9 +6,9 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <!-- %X{username:-anonymous} must match the MDC key "username" set by JwtFilter verbatim,
+            <!-- %X{email:-anonymous} must match the MDC key "email" set by JwtFilter verbatim,
                  otherwise it silently renders the default every time instead of erroring. -->
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [user=%X{username:-anonymous}] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [user=%X{email:-anonymous}] %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
