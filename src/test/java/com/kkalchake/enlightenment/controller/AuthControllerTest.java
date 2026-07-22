@@ -36,6 +36,7 @@ class AuthControllerTest {
 
     @Test
     void register_success() throws Exception {
+        when(jwtUtil.generateToken("john@example.com")).thenReturn("test-token-123");
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"john@example.com\",\"password\":\"password123\"}"))
