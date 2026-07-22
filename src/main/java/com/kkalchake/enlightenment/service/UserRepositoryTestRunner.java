@@ -19,9 +19,9 @@ public class UserRepositoryTestRunner implements CommandLineRunner {
         System.out.println("--- Bootstrapping Data ---");
 
         // Guard against duplicate on restart: with a persistent DB the user already exists
-        if (userRepository.findByUsername("test_engineer").isEmpty()) {
+        if (userRepository.findByEmail("test_engineer@example.com").isEmpty()) {
             User testUser = new User();
-            testUser.setUsername("test_engineer");
+            testUser.setEmail("test_engineer@example.com");
             testUser.setPasswordHash("hashed_password_123");
             userRepository.save(testUser);
         }

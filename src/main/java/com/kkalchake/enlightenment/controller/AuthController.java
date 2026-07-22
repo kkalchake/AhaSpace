@@ -24,17 +24,19 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@Valid @RequestBody UserRegistrationDto dto) {
         userService.registerUser(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User registered successfully"));
+        String token = jwtUtil.generateToken(dto.getEmail());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("token", token, "email", dto.getEmail(), "message", "User registered successfully"));
     }
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@Valid @RequestBody UserLoginDto dto) {
         if (userService.verifyUser(dto)) {
-            String token = jwtUtil.generateToken(dto.getUsername());
-            return ResponseEntity.ok(Map.of("token", token, "username", dto.getUsername()));
+            String token = jwtUtil.generateToken(dto.getEmail());
+            return ResponseEntity.ok(Map.of("token", token, "email", dto.getEmail()));
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Invalid username or password"));
+                .body(Map.of("error", "Invalid email or password"));
     }
 
     @GetMapping("/me")
@@ -42,6 +44,6 @@ public class AuthController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Not authenticated"));
         }
-        return ResponseEntity.ok(Map.of("username", authentication.getName()));
+        return ResponseEntity.ok(Map.of("email", authentication.getName()));
     }
 }

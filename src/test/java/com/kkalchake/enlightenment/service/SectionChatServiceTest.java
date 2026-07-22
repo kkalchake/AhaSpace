@@ -42,7 +42,7 @@ class SectionChatServiceTest {
 
         testUser = new User();
         testUser.setId(1L);
-        testUser.setUsername("testuser");
+        testUser.setEmail("testuser");
         testUser.setPasswordHash("hash");
 
         testSection = new Section();
@@ -59,7 +59,7 @@ class SectionChatServiceTest {
     @Test
     void processMessage_newSession_createsSessionAndPersistsMessages() {
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(testSection));
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(sectionChatSessionRepository.save(any())).thenReturn(savedSession);
         when(sectionChatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(anyString())).thenReturn("AI says hi");
@@ -87,7 +87,7 @@ class SectionChatServiceTest {
         sessionWithTruncatedTitle.setSection(testSection);
 
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(testSection));
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(sectionChatSessionRepository.save(any())).thenReturn(sessionWithTruncatedTitle);
         when(sectionChatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(anyString())).thenReturn("response");
@@ -116,7 +116,7 @@ class SectionChatServiceTest {
     @Test
     void processMessage_existingSession_wrongOwner_throwsForbidden() {
         User otherUser = new User();
-        otherUser.setUsername("otheruser");
+        otherUser.setEmail("otheruser");
         SectionChatSession otherSession = new SectionChatSession();
         otherSession.setId(7L);
         otherSession.setUser(otherUser);
@@ -173,7 +173,7 @@ class SectionChatServiceTest {
     @Test
     void processMessage_aiProviderThrows_propagatesException() {
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(testSection));
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(sectionChatSessionRepository.save(any())).thenReturn(savedSession);
         when(sectionChatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(any())).thenThrow(new RuntimeException("API error"));
@@ -185,7 +185,7 @@ class SectionChatServiceTest {
     @Test
     void processMessage_storesRawMessageAndSendsAugmentedPromptToAiProvider() {
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(testSection));
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.of(testUser));
         when(sectionChatSessionRepository.save(any())).thenReturn(savedSession);
         when(sectionChatMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(aiProvider.chat(anyString())).thenReturn("response");
@@ -219,7 +219,7 @@ class SectionChatServiceTest {
         s2.setSection(testSection);
         s2.setCreatedAt(LocalDateTime.now());
 
-        when(sectionChatSessionRepository.findByUserUsernameAndSectionIdOrderByCreatedAtDesc("testuser", 1L))
+        when(sectionChatSessionRepository.findByUserEmailAndSectionIdOrderByCreatedAtDesc("testuser", 1L))
                 .thenReturn(List.of(s1, s2));
 
         List<SectionChatSessionSummaryDto> result = sectionChatService.getSessions(1L, "testuser");
@@ -231,7 +231,7 @@ class SectionChatServiceTest {
 
     @Test
     void getSessions_emptyList() {
-        when(sectionChatSessionRepository.findByUserUsernameAndSectionIdOrderByCreatedAtDesc("testuser", 1L))
+        when(sectionChatSessionRepository.findByUserEmailAndSectionIdOrderByCreatedAtDesc("testuser", 1L))
                 .thenReturn(List.of());
 
         assertTrue(sectionChatService.getSessions(1L, "testuser").isEmpty());
@@ -275,7 +275,7 @@ class SectionChatServiceTest {
     @Test
     void getSession_wrongOwner_throwsForbiddenException() {
         User other = new User();
-        other.setUsername("otheruser");
+        other.setEmail("otheruser");
         SectionChatSession otherSession = new SectionChatSession();
         otherSession.setId(2L);
         otherSession.setUser(other);

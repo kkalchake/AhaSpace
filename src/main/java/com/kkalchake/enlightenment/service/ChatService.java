@@ -27,12 +27,12 @@ public class ChatService {
     private final UserRepository userRepository;
 
     @Transactional
-    public ChatResponse processMessage(String message, String username, Long sessionId) {
-        log.info("Processing chat message for user: {}", username);
+    public ChatResponse processMessage(String message, String email, Long sessionId) {
+        log.info("Processing chat message for user: {}", email);
         ChatSession session;
 
         if (sessionId == null) {
-            var user = userRepository.findByUsername(username)
+            var user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
             session = new ChatSession();
             session.setUser(user);
@@ -42,7 +42,7 @@ public class ChatService {
             session = chatSessionRepository.findById(sessionId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
             // Ownership check: prevent users from writing into another user's session
-            if (!session.getUser().getUsername().equals(username)) {
+            if (!session.getUser().getEmail().equals(email)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
             }
         }
@@ -67,18 +67,18 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<ChatSessionSummaryDto> getSessions(String username) {
-        return chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc(username)
+    public List<ChatSessionSummaryDto> getSessions(String email) {
+        return chatSessionRepository.findByUserEmailOrderByCreatedAtDesc(email)
                 .stream()
                 .map(s -> new ChatSessionSummaryDto(s.getId(), s.getTitle(), s.getCreatedAt()))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public ChatSessionDetailDto getSession(Long sessionId, String username) {
+    public ChatSessionDetailDto getSession(Long sessionId, String email) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
-        if (!session.getUser().getUsername().equals(username)) {
+        if (!session.getUser().getEmail().equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
         List<ChatMessageDto> messageDtos = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
@@ -93,11 +93,11 @@ public class ChatService {
     // because the entity is already loaded for the ownership check below — no extra
     // query needed, and cascade behavior is identical either way.
     @Transactional
-    public void deleteSession(Long sessionId, String username) {
+    public void deleteSession(Long sessionId, String email) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
         // Ownership check: prevent users from deleting another user's session
-        if (!session.getUser().getUsername().equals(username)) {
+        if (!session.getUser().getEmail().equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
         chatSessionRepository.delete(session);

@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 14 — Local Validation</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .lvl { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 2px; font-weight: 700; letter-spacing: 0.03em; }
+  .lvl.get { background: var(--inverse-bg); color: var(--inverse); }
+  .lvl.del { background: var(--danger-bg); color: var(--danger); }
+  .lvl.ok { background: var(--good-bg); color: var(--good); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .shot-caption { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin: 6px 0 0; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .status { color: var(--danger); font-weight: 700; }
+  .term .status.ok { color: var(--good); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .dialog-note {
+    margin-top: 14px; border: 1px dashed var(--inverse); background: var(--inverse-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .dialog-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--inverse); display: block; margin-bottom: 6px; }
+  .dialog-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 14 — Login UX, email-based auth</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub"><code>username</code> is gone from the stack entirely — not deprecated alongside <code>email</code>, replaced by it. The <code>User</code> entity now has exactly one identifier column (<code>email</code>, unique, <code>NOT NULL</code>); <code>UserLoginDto</code> and <code>UserRegistrationDto</code> no longer have a <code>username</code> field to validate; the JWT's subject claim is the email; and — because <code>ChatService</code>/<code>SectionChatService</code> both resolve "who is asking" via <code>Authentication.getName()</code> — both were updated (<code>findByUserEmailOrderByCreatedAtDesc</code> replaces the old username-keyed query) so the chat feature keeps working under an email-subject token. On the frontend, <code>Login.jsx</code> is a two-step flow (email, then password) with non-destructive failure handling; <code>Register.jsx</code> collects email, password, and a client-side-only confirm-password field, and now logs the user straight in on success instead of redirecting to a separate login screen. <code>Dashboard.jsx</code> is gone — both a fresh registration and a successful login land on <code>Home</code> (<code>/</code>), which now renders a persistent <code>NavBar</code>. Every request below is a real one against a locally running backend and a real Postgres database; every browser screenshot is a real headless-Chromium capture of the actual React app, taken against the current code (not the intermediate version an earlier draft of this guide captured).</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01–02</td><td>Data layer — <code>users</code> table schema, then a real registration insert and select</td><td>Only <code>id</code>/<code>email</code>/<code>password_hash</code> columns; <code>email</code> unique, <code>NOT NULL</code>; row visible with its email</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">03–05</td><td>Auth-gated flow — login with email, capture JWT, reuse it on <code>/me</code> and a real chat call</td><td>200s; chat call succeeds under the email-subject JWT</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06–07</td><td><code>POST /api/auth/register</code> — 400 validation, 409 duplicate email</td><td>Both real, correct field/error messages; no username check left to test</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08–09</td><td><code>POST /api/auth/login</code> — 401 wrong password, 400 missing email</td><td>Generic 401 message, field-specific 400</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">10</td><td><code>GET /api/auth/me</code> — no <code>Authorization</code> header</td><td><code>401</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">11–12</td><td>Browser: <code>Register.jsx</code> — filled form (email, password, confirm password), then submit</td><td>Real 201 logs the user straight in; lands on Home with the NavBar, no separate success banner/redirect</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">13–14</td><td>Browser: <code>Login.jsx</code> — step 1 (email only), step 2 (password revealed)</td><td>Password field absent from the DOM until Continue is clicked</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">15</td><td>Browser: <code>Login.jsx</code> — failed attempt</td><td>Inline error, email retained, <code>shake</code> class present on the container mid-animation — confirmed via <code>className</code>, not just visually</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">16</td><td>Browser: Home after a successful login</td><td>NavBar renders; "Welcome back, &lt;email&gt;" greeting, no overlap</td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Same two-repo, Postgres-via-Docker shape as recent weeks. One thing is genuinely different this run, and it's worth reading before starting the backend: an existing local Postgres volume with data from earlier weeks — including one with a leftover <code>username</code> column — will make this week's migration fail on startup. See step 2 below and the matching Troubleshooting entry.</p>
+
+<details class="recreate setup">
+  <summary>Start Postgres</summary>
+  <div class="body">
+    <ol>
+      <li>From the backend repo root:
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+      <li><strong>If this local database already has rows in <code>users</code> from a previous week</strong> (e.g. a seeded <code>test_engineer</code> row with no email), skip straight to the fix below rather than starting the backend first — it will fail either way, and this saves a round trip:
+        <pre>docker compose down -v
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+        This drops the local dev volume entirely and lets Hibernate create every table fresh on the next startup, seeded row included. Full explanation of <em>why</em> this is necessary is in Troubleshooting.
+      </li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the backend</summary>
+  <div class="body">
+    <ol>
+      <li>Kill any backend still holding port 8080 from a previous run:
+        <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true</pre>
+      </li>
+      <li>Run the app with the <code>dev</code> profile:
+        <pre>mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+      </li>
+      <li>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. <code>show-sql: true</code> in <code>application-dev.yaml</code> prints Hibernate's DML (select/insert/update) but not the schema-generation DDL itself, so the table's actual shape isn't visible in this log — step 01 below confirms it directly against Postgres instead:
+        <div class="shot-wrap"><div class="term"><div class="term-head">backend startup log (excerpt)</div><pre>2026-07-21 23:36:11.444 INFO  c.k.e.EnlightenmentApplication - Started EnlightenmentApplication in 1.432 seconds (process running for 1.534)
+--- Bootstrapping Data ---
+Hibernate: select u1_0.id,u1_0.email,u1_0.password_hash from users u1_0 where u1_0.email=?
+Hibernate: select count(*) from users u1_0
+User count in DB: 1
+------------------------------------------------
+<span class="status ok">SERVER IS LIVE on http://localhost:8080!</span>
+ Welcome Page: http://localhost:8080/welcome
+------------------------------------------------</pre></div></div>
+      </li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the frontend</summary>
+  <div class="body">
+    <ol>
+      <li>From the frontend repo root:
+        <pre>cd AhaSpaceUI
+npm install
+npm run dev</pre>
+      </li>
+      <li>Vite prints <code>Local: http://localhost:3000/</code> — <code>vite.config.js</code>'s <code>server.port: 3000</code> plus <code>strictPort: true</code> is what makes this reliable; without <code>strictPort</code>, an already-occupied port 3000 makes Vite silently fall back to 3001, which then fails CORS against <code>SecurityConfig</code>'s single allowed origin. See Troubleshooting if this happens anyway.</li>
+      <li>No new npm packages this week — the two-step reveal in <code>Login.jsx</code> is plain React state (<code>step</code>), the confirm-password check in <code>Register.jsx</code> is a client-side-only comparison, and the shake animation is a CSS <code>@keyframes</code> block in <code>Auth.css</code> (renamed from <code>Register.css</code>, now shared by both pages), not a library.</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== DATA LAYER ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer</summary>
+<p class="group-intro"><code>User.java</code> now has exactly one identifier column: <code>email</code>, unique and <code>NOT NULL</code> — <code>username</code> isn't a second column sitting alongside it, it was removed from the entity entirely. The comment in that file explains why <code>email</code> is <code>NOT NULL</code> from the start rather than nullable-then-backfilled: on an empty dev database, Hibernate's <code>ddl-auto: update</code> can add a <code>NOT NULL</code> column with no default in one step, because there are no existing rows for the new constraint to conflict with. (This assumption is exactly what breaks if the local volume already has rows from before this week — see Setup and Troubleshooting.)</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>Schema — <code>username</code> gone, <code>email</code> the sole identifier</h2></div>
+  <p class="step-note">Direct inspection of the real table via <code>psql</code> inside the running <code>ahaspace-postgres</code> container, on the fresh volume from Setup step 2. Three columns total, one unique constraint — not two.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ docker exec ahaspace-postgres psql -U ahaspace -d enlightenment -c "\d users"
+                                       Table "public.users"
+    Column     |          Type          | Collation | Nullable |              Default
+---------------+------------------------+-----------+----------+-----------------------------------
+ id            | bigint                 |           | not null | nextval('users_id_seq'::regclass)
+<span class="status ok"> email         | character varying(255) |           | not null |                                   </span>
+ password_hash | character varying(255) |           | not null |
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+<span class="status ok">    "uk_6dotkott2kjsp8vw4d0m25fb7" UNIQUE CONSTRAINT, btree (email)</span>
+Referenced by:
+    TABLE "user_courses" CONSTRAINT "fk5i2mwg17kvpk92fy6cdii93da" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "chat_sessions" CONSTRAINT "fk82ky97glaomlmhjqae1d0esmy" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "section_chat_sessions" CONSTRAINT "fkqfv2gv0gyms2b10p8kq395ons" FOREIGN KEY (user_id) REFERENCES users(id)</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>docker exec ahaspace-postgres psql -U ahaspace -d enlightenment -c "\d users"</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Real insert (registration), then a real select</h2></div>
+  <p class="step-note"><code>POST /api/auth/register</code> is the only path that writes to this table — no seed script bypasses <code>UserServiceImpl.registerUser</code>. The request body itself is proof <code>username</code> is gone: sending only <code>email</code> and <code>password</code> is enough. <code>test_engineer</code> below is the seeded row from <code>UserRepositoryTestRunner</code>; <code>week14_tester</code> is a fresh row created by this exact <code>curl</code> call.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}'
+<span class="status ok">{"email":"week14_tester@example.com","token":"eyJhbGciOiJIUzM4NCJ9...","message":"User registered successfully"}</span>
+
+$ docker exec ahaspace-postgres psql -U ahaspace -d enlightenment \
+  -c "SELECT id, email, password_hash FROM users;"
+ id |           email           |                        password_hash
+----+---------------------------+--------------------------------------------------------------
+  1 | test_engineer@example.com | hashed_password_123
+  2 | week14_tester@example.com | $2a$10$sjGuLXIZlO/znspxcSwGa.PWwENUggc4uZ5.vagyODlj8INUHRHK2
+(2 rows)</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">New this week: the <code>201</code> body itself now carries a <code>token</code>, not just a confirmation message — <code>AuthController.register</code> calls <code>jwtUtil.generateToken(dto.getEmail())</code> before responding, so the frontend (steps 11–12) can log the user in immediately without a second round trip to <code>/login</code>.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;new email&gt;","password":"testpass123"}'
+docker exec ahaspace-postgres psql -U ahaspace -d enlightenment \
+  -c "SELECT id, email, password_hash FROM users;"</pre>
+      <p>Pick an email you haven't used before — one already existing fails with a 409 (step 07 below exercises that on purpose).</p></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== AUTH-GATED FLOW ============================== -->
+<details class="group" open>
+<summary class="group-label">Auth-gated flow</summary>
+<p class="group-intro">The point of this section is the JWT's subject claim. <code>AuthController.login</code> now calls <code>jwtUtil.generateToken(dto.getEmail())</code> instead of the username — so decoding the token below shows an email in the <code>sub</code> claim, not a username. That token is then reused, unmodified, against two different endpoints to prove the email-as-subject change didn't just satisfy <code>/login</code> and <code>/me</code>: <code>ChatService</code> also had to be changed this week (its ownership checks call <code>Authentication.getName()</code>, which now returns an email) for a chat request under this same token to still work.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Log in with email, capture the JWT</h2></div>
+  <p class="step-note">Request body key is <code>email</code>, not <code>username</code> — <code>UserLoginDto</code> no longer has a <code>username</code> field at all. The response is now genuinely just <code>{"email": ..., "token": ...}</code> — no leftover <code>"username"</code> key standing in for the email; that interface-contract workaround from an earlier draft of this feature is gone along with the field itself.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}'
+<span class="status ok">{"email":"week14_tester@example.com","token":"eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJ3ZWVrMTRfdGVzdGVyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzg0NjkxNDA2LCJleHAiOjE3ODQ2OTUwMDZ9.ODGPffRpowC5xwtv0IrFBkozad1SJQx-lUTkM3cngLk-uqNaS6rD7-Vj1c_PGhgT"}</span>
+
+$ TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">The JWT's middle segment (base64url) decodes to <code>{'sub': 'week14_tester@example.com', 'iat': 1784691406, 'exp': 1784695006}</code> — the subject is the email, confirmed by decoding the actual token above, not by reading the source and assuming it.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Reuse the token on <code>GET /api/auth/me</code></h2></div>
+  <p class="step-note"><code>AuthController.me</code> is unchanged code — it always just echoed <code>authentication.getName()</code> back, now under the <code>email</code> key (also renamed this week, matching what the value actually is). <code>JwtFilter</code> sets the authentication's principal from the token's subject, which is the email as of step 03.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
+<span class="status ok">{"email":"week14_tester@example.com"}</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Reuse the same token on a real chat call</h2></div>
+  <p class="step-note">This is the follow-up fix, exercised end to end: <code>ChatController.chat</code> → <code>ChatService</code> resolves the caller's identity from the same <code>Authentication</code> object as <code>/me</code>, then looks up or creates that user's <code>ChatSession</code> row. <code>ChatSessionRepository</code>'s derived query is now <code>findByUserEmailOrderByCreatedAtDesc</code> — confirmed by name in the current source, and confirmed working here by an actual successful call under an email-subject token.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -X POST localhost:8080/api/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is an integral?"}'
+<span class="status ok">{"response":"In mathematics, an **integral** is a fundamental concept...","model":"gemini-2.5-flash-lite","sessionId":1,"sessionTitle":"What is an integral?"}</span>
+
+$ curl -s localhost:8080/api/chat/sessions -H "Authorization: Bearer $TOKEN"
+<span class="status ok">[{"id":1,"title":"What is an integral?","createdAt":"2026-07-21T23:36:46.335984"}]</span></pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/chat \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What is an integral?"}'
+curl -s localhost:8080/api/chat/sessions -H "Authorization: Bearer $TOKEN"</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT: REGISTER ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: POST /api/auth/register</summary>
+<p class="group-intro">Success (<code>201</code>) was already shown in step 02 above, using a real, freshly-inserted row — not repeated here. With <code>username</code> gone, there's now exactly one conflict check to test, not two: the old duplicate-username 409 no longer exists as a distinct scenario, since there's no username column left to collide on.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Failure — 400, both fields invalid</h2></div>
+  <p class="step-note"><code>UserRegistrationDto</code> validates exactly two fields now: <code>@Email</code> produces the <code>email</code> entry below, <code>password</code>'s message is unchanged from before this week. <code>GlobalExceptionHandler.handleValidationExceptions</code> collects every field error from the same <code>MethodArgumentNotValidException</code> into one flat map.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"not-an-email","password":"123"}'
+<span class="status">HTTP/1.1 400</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"password":"Password must be at least 6 characters long","email":"Email must be a valid email address"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"not-an-email","password":"123"}'</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Failure — 409, duplicate email</h2></div>
+  <p class="step-note"><code>UserServiceImpl.registerUser</code>'s only conflict check now: <code>userRepository.findByEmail(...)</code> present → <code>IllegalArgumentException("Email already exists")</code> → <code>GlobalExceptionHandler.handleIllegalArgument</code> maps it to <code>409</code>. The old two-check sequence (username first, then email) is gone along with the username field it was checking.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}'
+<span class="status">HTTP/1.1 409</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"error":"Email already exists"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;existing email&gt;","password":"testpass123"}'</pre></div>
+  </details>
+  <p class="step-note" style="margin-top:14px;"><strong>Known gap, not a bug to chase:</strong> <code>Register.jsx</code> only calls <code>setErrors(backendErrors)</code> for <code>400</code>/<code>409</code> responses on the <code>response.status === 400 || response.status === 409</code> branch — so this exact response <em>is</em> reaching the frontend's error state, but nothing in the JSX currently renders an <code>errors.error</code> key (only <code>errors.email</code>, <code>errors.password</code>, <code>errors.confirmPassword</code>, and <code>errors.global</code> have matching <code>&lt;span&gt;</code>/<code>&lt;div&gt;</code> elements). A user hitting a duplicate-email registration in the browser today sees no visible feedback at all — the request fails, silently, from their perspective. Still true after this week's redesign; a fix would either add an <code>errors.error</code> render target or have the backend key its 409 body under <code>email</code> instead of <code>error</code>.</p>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT: LOGIN ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: POST /api/auth/login</summary>
+<p class="group-intro">Success (<code>200</code>, with a real JWT) was already shown in step 03. This group covers the two failure shapes.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Failure — 401, wrong password</h2></div>
+  <p class="step-note">The error message itself changed this week, from <code>"Invalid username or password"</code> to <code>"Invalid email or password"</code> — small, but it's the string <code>Login.jsx</code>'s <code>formError</code> state renders verbatim in step 15 below, so it has to match exactly for that screenshot to make sense. The message stays deliberately generic (doesn't say which of the two fields was wrong) — <code>UserServiceImpl.verifyUser</code>'s comment explains the enumeration-timing risk this is guarding against, and that a full fix (constant-time short-circuiting) is deferred past this week. Confirmed real: a login against a completely nonexistent email returns the identical <code>{"error":"Invalid email or password"}</code> body, not a different message.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"wrongpass"}'
+<span class="status">HTTP/1.1 401</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"error":"Invalid email or password"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"wrongpass"}'</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>Failure — 400, missing email</h2></div>
+  <p class="step-note"><code>UserLoginDto.email</code>'s <code>@NotBlank</code> firing on a request with no <code>email</code> key at all. This is the same validation pipeline as step 06, just on the login DTO instead of the registration one.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"testpass123"}'
+<span class="status">HTTP/1.1 400</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"email":"Email is required"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"testpass123"}'</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT: ME ============================== -->
+<details class="group" open>
+<summary class="group-label">Endpoint: GET /api/auth/me</summary>
+<p class="group-intro">Success (<code>200</code>, value is the email) was already shown in step 04. The response shape hasn't changed at all this week — only the value has, because it echoes whatever <code>authentication.getName()</code> resolves to.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>Failure — 401, no Authorization header</h2></div>
+  <p class="step-note">No token at all means <code>JwtFilter</code> never populates an authenticated principal, so <code>authentication == null || !authentication.isAuthenticated()</code> is true and <code>AuthController.me</code> returns its own explicit <code>401</code> — unchanged code from before this week.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i localhost:8080/api/auth/me
+<span class="status">HTTP/1.1 401</span>
+<span class="dim">Content-Type: application/json</span>
+
+{"error":"Not authenticated"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -i localhost:8080/api/auth/me</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FRONTEND: REGISTER ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — Register.jsx</summary>
+<p class="group-intro">Real browser screenshots, headless Chromium via Playwright, driving the actual app on <code>http://localhost:3000</code>. A fresh account (<code>week14_browser@example.com</code>) is created here through the UI itself — not seeded via curl — so this and the Login walkthrough below are one continuous, real user journey.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>Filled form — email, password, confirm password</h2></div>
+  <p class="step-note">No username field anywhere on this page — it was removed, not left disabled. <code>Register.jsx</code> now has three inputs: <code>&lt;input type="email"&gt;</code> wired to <code>formData.email</code>, and a new <code>confirmPassword</code> field that only exists client-side (it's stripped out of the request body before <code>POST /api/auth/register</code> — the DTO from step 06/07 only ever sees <code>email</code> and <code>password</code>). A plain regex (<code>EMAIL_REGEX</code>) catches an obviously malformed address before the round trip — it mirrors, but doesn't replace, the backend's <code>@Email</code> validation.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-register-form-filled.png" alt="Register page with email, password, and confirm password fields all filled in, no username field present"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Open <code>http://localhost:3000/register</code> and fill in all three fields (email, password, confirm password) with an email you haven't registered before.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>Submit — real 201, straight into the app</h2></div>
+  <p class="step-note">New this week: clicking <strong>Register</strong> no longer redirects to a login screen with a success banner. It sends <code>{email, password}</code> to <code>POST /api/auth/register</code>; the real <code>201</code> now includes a <code>token</code> (see step 02), and <code>Register.jsx</code>'s handler calls <code>login(data.token, data.email)</code> — the same <code>AuthContext</code> call <code>Login.jsx</code> uses — then <code>navigate('/')</code>. A brand-new account lands the user already signed in, on Home, one step shorter than before.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/02-register-success-home.png" alt="Home page after a real successful registration, NavBar showing AI Chat, Courses and Logout links, greeting reads Welcome back followed by the registered email"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click <strong>Register</strong> on the filled form from step 11. The app navigates straight to <code>/</code> already authenticated — no intermediate login step.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FRONTEND: LOGIN ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — Login.jsx, two-step flow</summary>
+<p class="group-intro">The core UX change this week. <code>step</code> (React state, <code>'email' | 'password'</code>) controls whether the password <code>&lt;input&gt;</code> renders at all — it isn't hidden with CSS, it's conditionally rendered (<code>{step === 'password' && (...)}</code>), so there's no password field in the DOM during step 1, not just a visually hidden one. Clicking the step-1 button never touches the network: <code>handleSubmit</code> checks <code>if (step === 'email') { setStep('password'); return; }</code> before any <code>fetch</code> call exists in that function.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">13</span><h2>Step 1 — email only, button reads "Continue"</h2></div>
+  <p class="step-note">No password field anywhere on the page yet. The button's label itself is conditional — <code>{step === 'email' ? 'Continue' : 'Sign In'}</code> — same <code>&lt;button type="submit"&gt;</code> element in both steps, just relabeled. Confirmed at the DOM level: <code>page.locator('input[type="password"]').count()</code> returns <code>0</code> at this point, not just visually hidden.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/03-login-step-email.png" alt="Login page showing only the email field filled in and a Continue button, no password field visible"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Open <code>http://localhost:3000/login</code> and type an email address. Do not click Continue yet.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">14</span><h2>Step 2 — password field reveals, button reads "Sign In"</h2></div>
+  <p class="step-note">Clicking <strong>Continue</strong> runs client-side <code>validateForm()</code> against the email only (the password check is itself gated on <code>step === 'password'</code>, so it can't fire a "6 characters" error on a field that doesn't exist yet), then <code>setStep('password')</code>. The email value already typed carries over untouched — it's the same <code>formData</code> object, not a new form. Confirmed: the password input count goes from <code>0</code> to <code>1</code> right after this click.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/04-login-step-password.png" alt="Login page now showing the email field still filled plus a newly revealed password field, button now reads Sign In"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Click <strong>Continue</strong> from step 13. The password field appears below the email field.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">15</span><h2>Failed login — inline error, email retained, shake</h2></div>
+  <p class="step-note">Entering the wrong password and clicking <strong>Sign In</strong> hits the real <code>401</code> from step 08. <code>Login.jsx</code>'s response handling for that status is deliberately non-destructive: <code>setFormError('Invalid email or password')</code> and <code>setShake(true)</code> are the <em>only</em> state changes — <code>formData</code> (both fields) is never touched, so nothing gets cleared, unlike a design that resets the form on failure. There's no modal: the error is plain text rendered below the form. Confirmed at the DOM level during this run, not just visually: <code>input_value()</code> on the email field returned <code>week14_browser@example.com</code> unchanged, and the container's <code>className</code> read <code>"register-container shake"</code> at the moment this screenshot was taken (caught via <code>page.wait_for_function</code> polling for the class, since the CSS animation is only 0.4s and the class is removed on <code>onAnimationEnd</code> — a fixed-delay screenshot risks missing it entirely).</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/05-login-failed-shake.png" alt="Login page after a failed attempt, email field still showing the typed address, password field still filled, red inline error text reading Invalid email or password below the Sign In button"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From step 14, type an incorrect password and click <strong>Sign In</strong>. The form doesn't reset — both fields keep their values — and a red line of text appears under the button. The whole form box also does a brief horizontal shake (CSS animation, 0.4s); it's easy to miss live and easier to miss in a static screenshot unless you catch it mid-animation.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">16</span><h2>Successful login — Home shows the email, no Dashboard</h2></div>
+  <p class="step-note">Retyping the correct password and submitting hits the real <code>200</code> from step 03's endpoint. <code>login(data.token, data.email)</code> stores the email into <code>AuthContext</code> — a plain, correctly-named field now, not a <code>username</code> key doing double duty. <code>Dashboard.jsx</code> is deleted; the destination is <code>Home</code> (<code>/</code>), whose <code>&lt;p className="hero-subtext"&gt;</code> reads <code>Welcome back, {auth?.email}!</code>, and the persistent <code>NavBar</code> (new this week) renders above it on every route.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/06-login-success-home.png" alt="Home page after a successful login, NavBar showing AI Chat, Courses and Logout links, greeting reads Welcome back followed by the full email address, no overlapping text"></div>
+  <p class="step-note" style="margin-top:14px;"><strong>Resolved, not carried forward:</strong> an earlier draft of this guide, written against an intermediate version of this feature, documented a cosmetic bug where the post-login heading's text overlapped itself for a long email address. That bug lived in <code>Dashboard.jsx</code>'s <code>&lt;h1&gt;</code>, which no longer exists — removing the page removed the bug along with it. This screenshot shows no overlap.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From step 15, correct the password and click <strong>Sign In</strong> again. The app navigates to <code>/</code>, not <code>/dashboard</code>.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">Two carry forward unchanged from Week 12 (port conflicts are timeless). One is new to this week, hit while preparing this guide.</p>
+
+<section class="step">
+  <div class="step-head"><h2>Backend fails at startup with "column &quot;email&quot; ... contains null values"</h2></div>
+  <p class="step-note">Hit on the very first attempt to run this week's backend against a local Postgres volume left over from an earlier week — including one with a leftover <code>username</code> column, now that <code>username</code> is gone from the entity entirely. The <code>ddl-auto: update</code> path tried to run <code>alter table users add column email varchar(255) not null</code> against a table that already had rows (a seeded <code>test_engineer</code>, and possibly others from earlier weeks' testing) — Postgres rejects a <code>NOT NULL</code> column addition with no default the moment any existing row would get a null value, and refuses the whole statement. The application then fails a step later, less obviously: it starts, but the very first query against <code>users</code> throws <code>column u1_0.email does not exist</code>, because the column was never actually added. The <code>User.java</code> comment claiming "the dev DB has no rows yet" is an assumption about a <em>fresh</em> volume — true the first time this feature is tested, false on any volume that survived a previous week.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Confirm this is the cause: <pre>docker logs ahaspace-postgres 2>&1 | grep -i "contains null"</pre> or check the Spring Boot startup log directly for <code>CommandAcceptanceException</code> around an <code>alter table ... add column email</code> statement.</li>
+        <li>For local dev data with nothing worth preserving, drop the volume and let Hibernate recreate everything from scratch: <pre>docker compose down -v
+docker compose up -d</pre></li>
+        <li>Start the backend again. <code>show-sql</code> doesn't print the schema-generation DDL itself (see Setup), but a clean startup followed by step 01's <code>\d users</code> confirms the table came up with just <code>id</code>/<code>email</code>/<code>password_hash</code>, and the seeded <code>test_engineer</code> row is inserted fresh, with its email, by <code>UserRepositoryTestRunner</code>.</li>
+      </ol>
+      <p>The alternative — backfilling a real email onto every existing row by hand before letting the constraint apply — is the shape a production migration would need to take; it isn't worth doing against disposable local dev data.</p>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>"Port 8080 was already in use" on startup <em>(carried forward)</em></h2></div>
+  <p class="step-note">Spring Boot's <code>APPLICATION FAILED TO START</code> banner. Cause: a previous run of this same app is still alive and holding the port.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find the process: <pre>lsof -nP -iTCP:8080 -sTCP:LISTEN</pre></li>
+        <li>Confirm it's the stale app: <pre>ps -p &lt;PID&gt; -o pid,ppid,etime,command</pre></li>
+        <li>Stop it: <pre>kill -15 &lt;PID&gt;</pre> then <pre>kill -9 &lt;PID&gt;</pre> if it's still listed a few seconds later.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Frontend silently comes up on 3001 instead of 3000 <em>(carried forward)</em></h2></div>
+  <p class="step-note">A stray <code>vite</code> process from an earlier session already holding port 3000 makes a second <code>npm run dev</code> fall back to 3001 — which <code>vite.config.js</code>'s <code>strictPort: true</code> is specifically meant to prevent by failing loudly instead. If it's ever removed or bypassed, the symptom is a generic "Network error" on every request plus a CORS error in devtools, since <code>SecurityConfig</code>'s CORS policy allows exactly <code>http://localhost:3000</code>.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Find whatever's already on 3000: <pre>lsof -nP -iTCP:3000 -sTCP:LISTEN</pre></li>
+        <li>Kill the stale process and restart <code>npm run dev</code> cleanly.</li>
+        <li>Confirm the terminal prints <code>Local: http://localhost:3000/</code> before opening the browser.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

@@ -37,7 +37,7 @@ class SectionChatMessageRepositoryTest {
     @BeforeEach
     void setUp() {
         User user = new User();
-        user.setUsername("testuser");
+        user.setEmail("testuser@example.com");
         user.setPasswordHash("hash");
         userRepository.save(user);
 

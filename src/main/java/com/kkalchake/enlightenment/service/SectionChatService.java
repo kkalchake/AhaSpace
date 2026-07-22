@@ -28,8 +28,8 @@ public class SectionChatService {
     private final SectionRepository sectionRepository;
 
     @Transactional
-    public SectionChatResponse processMessage(Long sectionId, String message, String username, Long sessionId) {
-        log.info("Processing section chat message for user: {}, section: {}", username, sectionId);
+    public SectionChatResponse processMessage(Long sectionId, String message, String email, Long sessionId) {
+        log.info("Processing section chat message for user: {}, section: {}", email, sectionId);
 
         Section section = sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
@@ -37,7 +37,7 @@ public class SectionChatService {
         SectionChatSession session;
 
         if (sessionId == null) {
-            var user = userRepository.findByUsername(username)
+            var user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
             session = new SectionChatSession();
             session.setUser(user);
@@ -48,7 +48,7 @@ public class SectionChatService {
             session = sectionChatSessionRepository.findById(sessionId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
             // Ownership check: prevent users from writing into another user's session
-            if (!session.getUser().getUsername().equals(username)) {
+            if (!session.getUser().getEmail().equals(email)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
             }
             // Section-match check: a sessionId that exists but belongs to a different section
@@ -81,18 +81,18 @@ public class SectionChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<SectionChatSessionSummaryDto> getSessions(Long sectionId, String username) {
-        return sectionChatSessionRepository.findByUserUsernameAndSectionIdOrderByCreatedAtDesc(username, sectionId)
+    public List<SectionChatSessionSummaryDto> getSessions(Long sectionId, String email) {
+        return sectionChatSessionRepository.findByUserEmailAndSectionIdOrderByCreatedAtDesc(email, sectionId)
                 .stream()
                 .map(s -> new SectionChatSessionSummaryDto(s.getId(), s.getTitle(), s.getCreatedAt()))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public SectionChatSessionDetailDto getSession(Long sectionId, Long sessionId, String username) {
+    public SectionChatSessionDetailDto getSession(Long sectionId, Long sessionId, String email) {
         SectionChatSession session = sectionChatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
-        if (!session.getUser().getUsername().equals(username)) {
+        if (!session.getUser().getEmail().equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
         if (!session.getSection().getId().equals(sectionId)) {
@@ -109,11 +109,11 @@ public class SectionChatService {
     // all of its SectionChatMessage rows. delete(session) is used (rather than deleteById)
     // because the entity is already loaded for the ownership/section checks below.
     @Transactional
-    public void deleteSession(Long sectionId, Long sessionId, String username) {
+    public void deleteSession(Long sectionId, Long sessionId, String email) {
         SectionChatSession session = sectionChatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
         // Ownership check: prevent users from deleting another user's session
-        if (!session.getUser().getUsername().equals(username)) {
+        if (!session.getUser().getEmail().equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
         // Section-match check: a sessionId that exists but belongs to a different section

@@ -25,13 +25,13 @@ class ChatSessionRepositoryTest {
     @BeforeEach
     void setUp() {
         testUser = new User();
-        testUser.setUsername("testuser");
+        testUser.setEmail("testuser@example.com");
         testUser.setPasswordHash("hash");
         testUser = userRepository.save(testUser);
     }
 
     @Test
-    void findByUserUsernameOrderByCreatedAtDesc_returnsSessions() {
+    void findByUserEmailOrderByCreatedAtDesc_returnsSessions() {
         ChatSession s1 = new ChatSession();
         s1.setUser(testUser);
         s1.setTitle("First");
@@ -42,15 +42,15 @@ class ChatSessionRepositoryTest {
         s2.setTitle("Second");
         chatSessionRepository.save(s2);
 
-        List<ChatSession> result = chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc("testuser");
+        List<ChatSession> result = chatSessionRepository.findByUserEmailOrderByCreatedAtDesc("testuser@example.com");
         assertEquals(2, result.size());
-        result.forEach(s -> assertEquals("testuser", s.getUser().getUsername()));
+        result.forEach(s -> assertEquals("testuser@example.com", s.getUser().getEmail()));
     }
 
     @Test
-    void findByUserUsernameOrderByCreatedAtDesc_differentUser_returnsEmpty() {
+    void findByUserEmailOrderByCreatedAtDesc_differentUser_returnsEmpty() {
         User other = new User();
-        other.setUsername("otheruser");
+        other.setEmail("otheruser@example.com");
         other.setPasswordHash("hash");
         userRepository.save(other);
 
@@ -59,7 +59,7 @@ class ChatSessionRepositoryTest {
         s.setTitle("Other's session");
         chatSessionRepository.save(s);
 
-        List<ChatSession> result = chatSessionRepository.findByUserUsernameOrderByCreatedAtDesc("testuser");
+        List<ChatSession> result = chatSessionRepository.findByUserEmailOrderByCreatedAtDesc("testuser@example.com");
         assertTrue(result.isEmpty());
     }
 
