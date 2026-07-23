@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 15 — Auth Hardening</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--owning-bg); color: var(--owning); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .shot-caption { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin: 6px 0 0; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .status { color: var(--danger); font-weight: 700; }
+  .term .status.ok { color: var(--good); }
+  .term .status.warn { color: var(--owning); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .dialog-note {
+    margin-top: 14px; border: 1px dashed var(--inverse); background: var(--inverse-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .dialog-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--inverse); display: block; margin-bottom: 6px; }
+  .dialog-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .flag-note {
+    margin-top: 14px; border: 1px dashed var(--danger); background: var(--danger-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .flag-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--danger); display: block; margin-bottom: 6px; }
+  .flag-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 15 — Auth hardening</p>
+  <h1>Local validation, run end-to-end</h1>
+  <p class="sub">Backend-only week, no <code>AhaSpaceUI</code> involved — everything here is a <code>curl</code> call, a build/startup log, or the H2 web console, all against a locally running backend and a real Postgres database. Three independent changes: <code>SecurityConfig.passwordEncoder()</code> now returns a <code>DelegatingPasswordEncoder</code> defaulting new hashes to Argon2id (prefixed <code>{argon2}</code>) while keeping a registered <code>BCryptPasswordEncoder</code> for the <code>bcrypt</code> id; a new <code>LoginRateLimitFilter</code> caps <code>POST /api/auth/login</code> at 5 attempts per IP with a 15-minute refill window, returning <code>429</code> with a fixed JSON body and a <code>Retry-After</code> header once exhausted; and <code>JwtUtil</code>'s <code>@Value("${jwt.secret}")</code> lost its hardcoded fallback, so the app now fails to start — loudly, at the Spring context level — if <code>jwt.secret</code> isn't supplied by some profile. No endpoint shape changed: <code>register</code>, <code>login</code>, and <code>me</code> all return exactly what they did last week, the only wire-visible difference is the new <code>429</code> path on <code>login</code>.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01</td><td>Setup — start without <code>jwt.secret</code> set</td><td>Spring context fails to start, app never binds port 8080</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02</td><td>Setup — start with the <code>dev</code> profile active</td><td>Boots normally, <code>SERVER IS LIVE</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">03</td><td>Data layer — register, then inspect <code>password_hash</code> via H2 console against the real Postgres row</td><td>New row's hash is <code>{argon2}$argon2id$...</code>; pre-week-15 rows are raw <code>$2a$10$...</code> bcrypt with no scheme prefix at all</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">04</td><td>Auth-gated flow — register baseline, login, capture JWT, reuse on <code>/me</code></td><td>201 / 200 / 200, JWT subject is the email, unchanged from last week</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">05</td><td><code>POST /api/auth/login</code> — six rapid requests, same IP</td><td>First five 200, sixth 429 with the exact error body and a <code>Retry-After</code> header</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06</td><td>Backward-compat check — log in as a user whose hash predates this week's <code>DelegatingPasswordEncoder</code> change</td><td>Plan claims old hashes still verify</td><td><span class="pill ok">FIXED</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Same Postgres-via-Docker shape as recent weeks, plus one new deliberate step: starting the app <em>without</em> the <code>dev</code> profile active, to see the new fail-fast behavior for real before doing anything else. No frontend server needed this week — <code>AhaSpaceUI</code> isn't touched.</p>
+
+<details class="recreate setup">
+  <summary>Start Postgres</summary>
+  <div class="body">
+    <ol>
+      <li>From the backend repo root:
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Confirm the dev profile file exists</summary>
+  <div class="body">
+    <ol>
+      <li><code>src/main/resources/application-dev.yaml</code> is gitignored — if it's missing, copy it from the example and it already ships a working <code>jwt.secret</code> for local dev:
+        <pre>cp src/main/resources/application-dev.yaml.example src/main/resources/application-dev.yaml</pre>
+      </li>
+      <li>Then edit it and set <code>gemini.api.key</code> to a real key — unrelated to this week's changes, but required for the app to boot at all (<code>GeminiService</code> reads it at construction).</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== ENDPOINT-LEVEL: STARTUP BEHAVIOR ============================== -->
+<details class="group" open>
+<summary class="group-label">New behavior: JWT secret fail-fast</summary>
+<p class="group-intro"><code>JwtUtil.secret</code> changed from <code>@Value("${jwt.secret:default-dev-secret-key-must-be-32-chars-long}")</code> to <code>@Value("${jwt.secret}")</code> — dropping everything after the colon drops the fallback value entirely, not just its default text. Spring's property placeholder resolution has no fallback left to use, so it throws instead of substituting a known-weak string. This step runs the app with no active Spring profile at all, so <code>application-dev.yaml</code> (which supplies its own <code>jwt.secret</code>) never loads and the base <code>application.yaml</code>'s bare <code>${JWT_SECRET}</code> placeholder is left unresolved.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">01</span><h2>Start with no profile, no <code>JWT_SECRET</code> env var — real console output</h2></div>
+  <p class="step-note">Real <code>mvn spring-boot:run</code> output, no flags. Tomcat gets far enough to allocate port 8080 and register the H2 console before the failure — the crash happens while wiring <code>JwtFilter</code> (which depends on <code>JwtUtil</code>, which depends on the missing <code>jwt.secret</code>), not at the very first line of startup. The app never actually starts serving; the port is released again immediately after.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ mvn spring-boot:run
+...
+2026-07-22 20:53:20.389 INFO  c.k.e.EnlightenmentApplication - Starting EnlightenmentApplication using Java 21.0.9
+2026-07-22 20:53:20.390 INFO  c.k.e.EnlightenmentApplication - No active profile set, falling back to 1 default profile: "default"
+2026-07-22 20:53:20.829 INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-07-22 20:53:20.863 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-07-22 20:53:20.934 INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:learning_db user=SA
+2026-07-22 20:53:20.940 INFO  o.s.b.a.h.H2ConsoleAutoConfiguration - H2 console available at '/h2-console'. Database available at 'jdbc:h2:mem:learning_db'
+<span class="status">2026-07-22 20:53:20.947 ERROR o.s.b.w.e.tomcat.TomcatStarter - Error starting Tomcat context. Exception: org.springframework.beans.factory.UnsatisfiedDependencyException. Message: Error creating bean with name 'jwtFilter' defined in file [.../filter/JwtFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'jwtUtil': Injection of autowired dependencies failed</span>
+2026-07-22 20:53:20.955 INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-07-22 20:53:20.956 WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Unable to start web server
+...
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'jwtUtil': Injection of autowired dependencies failed
+...
+<span class="status">Caused by: java.lang.IllegalArgumentException: Could not resolve placeholder 'JWT_SECRET' in value "${JWT_SECRET}"</span>
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:180)
+...
+[INFO] BUILD FAILURE
+<span class="status">[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.2.0:run (default-cli) on project enlightenment: Process terminated with exit code: 1</span></pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">The root cause reads exactly as expected: <code>Could not resolve placeholder 'JWT_SECRET' in value "${JWT_SECRET}"</code> — the base <code>application.yaml</code>'s <code>jwt.secret: ${JWT_SECRET}</code> line, with no default and no active profile supplying an override. Bean creation fails for <code>jwtUtil</code>, which cascades to <code>jwtFilter</code> (constructor-injects it), which cascades to the whole servlet context failing to initialize. This confirms <code>verification.md</code>'s Phase 6 finding byte-for-byte against a real, freshly-run process — not re-read from that file.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Make sure no <code>JWT_SECRET</code> env var is set in the shell: <pre>unset JWT_SECRET</pre></li>
+        <li>Run without the <code>dev</code> profile: <pre>mvn spring-boot:run</pre></li>
+        <li>Watch it fail during context startup rather than serve any request — the important part is that the failure happens at boot, before any endpoint is reachable, not at request time.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Start with the <code>dev</code> profile — boots normally</h2></div>
+  <p class="step-note"><code>application-dev.yaml</code> supplies its own literal <code>jwt.secret</code> (a 45-character dev value, well over the 32-char minimum <code>Keys.hmacShaKeyFor</code> needs for HS384), so the same placeholder that failed above now resolves and the app comes up exactly as before this week.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ lsof -ti:8080 | xargs kill -9 2>/dev/null; true
+$ mvn spring-boot:run -Dspring-boot.run.profiles=dev
+...
+2026-07-22 20:55:08.695 INFO  c.k.e.EnlightenmentApplication - Started EnlightenmentApplication in 1.603 seconds (process running for 1.732)
+------------------------------------------------
+<span class="status ok">SERVER IS LIVE on http://localhost:8080!</span>
+ Welcome Page: http://localhost:8080/welcome
+------------------------------------------------</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+    <p>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code> before sending any request below.</p></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== DATA LAYER ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer</summary>
+<p class="group-intro">No table or column changed this week — <code>users</code> is still exactly <code>id</code> / <code>email</code> / <code>password_hash</code> from Week 14. What changed is the <em>content</em> of <code>password_hash</code> for any row written from this point forward. This week's dev Postgres volume happened to still have rows left over from Week 14's testing, which turned out to be useful: they show the actual old format directly, rather than as a described-but-unverified claim.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Real screenshot — old rows vs. a freshly-registered Argon2id row</h2></div>
+  <p class="step-note">Registered a new user through the real endpoint (<code>week15_tester@example.com</code>, via <code>POST /api/auth/register</code> — same call as step 04 below), then opened <code>/h2-console</code> in a browser and connected it to the actual running Postgres datasource (JDBC URL <code>jdbc:postgresql://localhost:5432/enlightenment</code>, not H2's own in-memory one — the H2 console is a generic SQL client, not tied to an H2-only backend, and <code>org.postgresql.Driver</code> is already on the classpath). Ran <code>SELECT id, email, password_hash FROM users ORDER BY id;</code> directly against it.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-h2-console-password-hash.png" alt="H2 console web UI connected to the real Postgres database, showing a users table query result with four rows: id 1 test_engineer with a plain hashed_password_123 placeholder, id 2 and 5 (week14_tester, week14_browser) with raw dollar-sign-2a-dollar-sign-10 bcrypt hashes and no scheme prefix, and id 6 (week15_tester) with a curly-brace-argon2-curly-brace prefixed argon2id hash"></div>
+  <p class="step-note" style="margin-top:14px;"><strong>Row 6, <code>week15_tester@example.com</code></strong>: <code>{argon2}$argon2id$v=19$m=16384,t=2,p=1$...</code> — the <code>{argon2}</code> prefix is <code>DelegatingPasswordEncoder</code>'s own bookkeeping (it writes the id of whichever encoder produced the hash, so a future <code>matches()</code> call knows which registered encoder to route to), and everything after it is a standard Argon2id encoded hash: algorithm variant, then <code>v=19</code> (the Argon2 spec version), then the tuned cost parameters (<code>m</code>=memory in KiB, <code>t</code>=iterations, <code>p</code>=parallelism) <code>Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()</code> sets, then the salt and hash themselves, both base64.</p>
+  <p class="step-note"><strong>Rows 2 and 5, <code>week14_tester</code>/<code>week14_browser</code></strong> (both written last week, before this change existed): <code>$2a$10$...</code> — a bare BCrypt hash with <em>no scheme prefix at all</em>. This is the actual old format, and it's worth being precise about it: it is not literally <code>{bcrypt}$2a$10$...</code>. Last week's <code>SecurityConfig</code> constructed <code>new BCryptPasswordEncoder()</code> directly, with no <code>DelegatingPasswordEncoder</code> wrapper — so nothing ever wrote a <code>{bcrypt}</code> prefix into these rows in the first place. The plan's "still able to verify old <code>{bcrypt}</code> hashes" language describes the encoder <em>registered</em> to handle the <code>bcrypt</code> id inside the new <code>DelegatingPasswordEncoder</code> map, not a claim that pre-existing rows already carry that literal prefix string. See step 06 below for what this distinction turns out to mean in practice.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Register a fresh user: <pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;new email&gt;","password":"testpass123"}'</pre></li>
+        <li>Open <code>http://localhost:8080/h2-console</code> in a browser.</li>
+        <li>On the login form, set <strong>Driver Class</strong> to <code>org.postgresql.Driver</code>, <strong>JDBC URL</strong> to <code>jdbc:postgresql://localhost:5432/enlightenment</code>, <strong>User Name</strong> <code>ahaspace</code>, <strong>Password</strong> <code>ahaspace</code>, then click <strong>Connect</strong>. (The form's default fields point at H2's own in-memory database — those need to be overwritten to reach the app's actual Postgres data, since the <code>dev</code> profile overrides <code>spring.datasource</code> away from the base <code>application.yaml</code>'s H2 settings.)</li>
+        <li>In the SQL box, run: <pre>SELECT id, email, password_hash FROM users ORDER BY id;</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== AUTH-GATED FLOW ============================== -->
+<details class="group" open>
+<summary class="group-label">Auth-gated flow</summary>
+<p class="group-intro">Register, log in, capture the JWT, reuse it. Nothing about the token's shape or the <code>/me</code> response changed this week — the point here is to show that the surrounding hardening (password encoding, rate limiting, fail-fast secret) is genuinely invisible to a client that isn't doing anything unusual.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Register, log in, capture the JWT, reuse it on <code>/me</code></h2></div>
+  <p class="step-note">Three real calls in sequence against the running <code>dev</code>-profile backend. The register call is the one that produced row 6 in step 03 above.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week15_tester@example.com","password":"testpass123"}'
+<span class="status ok">HTTP/1.1 201</span>
+Content-Type: application/json
+
+{"message":"User registered successfully","email":"week15_tester@example.com","token":"eyJhbGciOiJIUzM4NCJ9..."}
+
+$ TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week15_tester@example.com","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+$ curl -s -i localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
+<span class="status ok">HTTP/1.1 200</span>
+Content-Type: application/json
+
+{"email":"week15_tester@example.com"}</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">The login response's JWT, decoded (middle segment, base64url): <code>{"sub":"week15_tester@example.com","iat":1784770010,"exp":1784773610}</code> — subject is the email, <code>exp - iat</code> is exactly 3600 seconds, matching <code>jwt.expiration: 3600000</code> (milliseconds) in <code>application-dev.yaml</code>. Identical shape to Week 14; the password-encoding change underneath it is invisible from this side of the API.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;new email&gt;","password":"testpass123"}'
+
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;same email&gt;","password":"testpass123"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+curl -s -i localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINT: LOGIN RATE LIMIT ============================== -->
+<details class="group" open>
+<summary class="group-label">New behavior: POST /api/auth/login rate limiting</summary>
+<p class="group-intro"><code>LoginRateLimitFilter</code> sits in front of <code>JwtFilter</code> in the security chain (<code>addFilterBefore(loginRateLimitFilter, JwtFilter.class)</code>) and only looks at requests matching <code>POST /api/auth/login</code> exactly — every other path, including <code>register</code> and <code>me</code>, passes through <code>shouldNotFilter</code> untouched. Each client IP gets its own <code>Bucket4j</code> token bucket: capacity 5, refilling 5 tokens every 15 minutes. Every request to this path — successful login or not — consumes one token; the limiter counts attempts, not failures.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Six rapid requests from one IP — the sixth is <code>429</code></h2></div>
+  <p class="step-note">Six back-to-back <code>POST /api/auth/login</code> calls against the same running server, same client (so the same resolved IP — <code>resolveClientIp</code> falls back to <code>request.getRemoteAddr()</code> since no <code>X-Forwarded-For</code> header is sent by <code>curl</code> here). Requests 1 through 5 each successfully consume one of the bucket's 5 tokens and return <code>200</code>; request 6 finds the bucket empty.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — requests 1-5 (abbreviated, all 200)</div><pre>$ for i in 1 2 3 4 5; do
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:8080/api/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"week15_tester@example.com","password":"testpass123"}'
+  done
+<span class="status ok">200
+200
+200
+200
+200</span></pre></div>
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;">
+  <div class="term"><div class="term-head">terminal — request 6, full response including headers</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week15_tester@example.com","password":"testpass123"}'
+<span class="status">HTTP/1.1 429</span>
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+<span class="status">Retry-After: 850</span>
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: application/json;charset=ISO-8859-1
+Content-Length: 60
+Date: Thu, 23 Jul 2026 01:27:11 GMT
+
+{"error":"Too many login attempts. Please try again later."}</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">Body matches the contract byte-for-byte: <code>{"error":"Too many login attempts. Please try again later."}</code>. <code>Retry-After: 850</code> is <code>ConsumptionProbe.getNanosToWaitForRefill()</code> converted to whole seconds — it moves down on every re-run closer to the 15-minute mark from when the bucket was first drained, not a fixed constant, so a different run of this guide will show a different number here (anywhere up to 900).</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Confirm the account exists (register it if not — see step 04).</li>
+        <li>Send five requests in a row: <pre>for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:8080/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"&lt;registered email&gt;","password":"testpass123"}'
+done</pre></li>
+        <li>Send a sixth, this time with full headers: <pre>curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"&lt;registered email&gt;","password":"testpass123"}'</pre></li>
+        <li>Expect <code>429</code>, the exact JSON body above, and a <code>Retry-After</code> header. Wrong-password requests count identically toward the same 5 — the limiter never inspects whether the login actually succeeded.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Confirming what the limiter does <em>not</em> block</h2></div>
+  <p class="step-note">With the bucket for this IP already empty from step 05, two more real calls: <code>POST /api/auth/register</code> (different path, never touches this filter) and <code>GET /api/auth/me</code> with a valid token (different path, and a <code>GET</code> besides). Both succeed normally, confirming <code>shouldNotFilter</code>'s path+method match is doing its job rather than accidentally rate-limiting the whole <code>/api/auth/**</code> tree.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week15_register_demo@example.com","password":"testpass123"}'
+<span class="status ok">HTTP/1.1 201</span>
+
+$ curl -s -i localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
+<span class="status ok">HTTP/1.1 200</span>
+{"email":"week15_tester@example.com"}</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Immediately after step 05's sixth request, without waiting: register a brand-new email, and separately call <code>GET /api/auth/me</code> with a still-valid token. Both should succeed even though <code>POST /api/auth/login</code> is currently returning 429 for the same IP.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== BACKWARD-COMPAT FINDING ============================== -->
+<details class="group" open>
+<summary class="group-label">Backward-compat check: pre-week-15 password hashes</summary>
+<p class="group-intro">The plan's stated intent for switching to <code>DelegatingPasswordEncoder</code> is that it "still able to verify old <code>{bcrypt}</code> hashes" without forcing a migration. Step 03 already established that rows written before this week don't actually carry a <code>{bcrypt}</code> (or any) prefix — they're bare <code>$2a$10$...</code> BCrypt output from last week's plain <code>new BCryptPasswordEncoder()</code>. This step tests, against real data, whether such a row can still log in.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Logging in as <code>week14_tester@example.com</code> — a real pre-existing unprefixed hash</h2></div>
+  <p class="step-note">Same password used to create this account last week (<code>testpass123</code>, confirmed working in Week 14's own guide). Row 2 from step 03's screenshot: <code>password_hash = $2a$10$sjGuLXIZlO/znspxcSwGa.PWwENUggc4uZ5.vagyODlj8INUHRHK2</code>, no <code>{...}</code> prefix.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal</div><pre>$ curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}'
+<span class="status">HTTP/1.1 409</span>
+Content-Type: application/json
+
+{"error":"There is no PasswordEncoder mapped for the id \"null\""}</pre></div>
+  </div>
+  <div class="flag-note">
+    <span class="k">Result at time of testing: did not match the plan's stated intent (since fixed — see below)</span>
+    Spring Security's <code>DelegatingPasswordEncoder.matches()</code> reads the id out of a leading <code>{id}</code> prefix on the stored hash; a hash with no prefix at all resolves to a <code>null</code> id. <code>SecurityConfig.passwordEncoder()</code> did not have a default handler configured for that case, so it threw <code>IllegalArgumentException("There is no PasswordEncoder mapped for the id \"null\"")</code> instead of comparing against BCrypt. <code>UserServiceImpl.verifyUser</code> doesn't catch it, so it propagated up to <code>GlobalExceptionHandler</code>'s generic <code>IllegalArgumentException</code> handler — the same one that produces the legitimate <code>409</code> "Email already exists" response in the register flow — which is why this surfaced as a <code>409</code> with a confusing, internals-leaking message rather than the expected <code>401</code>. Every account that registered before this week's change was unable to log in at all until this was fixed.
+  </div>
+  <div class="flag-note" style="border-left-color:#2e8b57">
+    <span class="k">Fix applied (same branch, after this finding)</span>
+    <code>SecurityConfig.passwordEncoder()</code> now calls <code>.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder())</code> on the constructed <code>DelegatingPasswordEncoder</code>, which routes any hash with no recognized <code>{id}</code> prefix to BCrypt for comparison instead of throwing. New passwords still encode as <code>{argon2}...</code> by default — only the matching path for legacy unprefixed hashes changed. Note: switching to Spring's <code>PasswordEncoderFactories.createDelegatingPasswordEncoder()</code> convenience factory was considered and rejected — that factory defaults new encodes to <code>bcrypt</code>, not <code>argon2</code>, which would have silently undone this week's Argon2id decision. Covered by a new <code>SecurityConfigTest</code> (<code>unprefixedLegacyBcryptHashStillMatches</code>, <code>newHashesUseArgon2Prefix</code>); full suite re-run at 111/111 passing with the Jacoco 60% gate still met. The live <code>409</code> response above reflects the bug as originally found — it was not re-captured after the fix since it requires the app to be running; re-run this step's "Recreate this step" against a live server to see the corrected <code>200</code> response.
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Need a <code>users</code> row whose <code>password_hash</code> predates this week's <code>SecurityConfig</code> change (no leading <code>{...}</code> in step 03's screenshot) and whose plaintext password is known. <code>week14_tester@example.com</code> / <code>testpass123</code>, left over from Week 14's guide on this same dev Postgres volume, works if the volume hasn't been recreated since.</li>
+        <li><pre>curl -s -i -X POST localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"week14_tester@example.com","password":"testpass123"}'</pre></li>
+        <li>If this returns <code>429</code> instead, the rate-limit bucket for your IP is still exhausted from an earlier step (see Troubleshooting) — either wait out the refill window or restart the backend to reset it, then retry.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">Port-conflict and stale-process entries are unchanged from Week 14 and are omitted here rather than duplicated — see <a href="../week-14/">Week 14's Troubleshooting section</a> if a startup hangs on <code>Port 8080 was already in use</code>. Everything below is specific to this week.</p>
+
+<section class="step">
+  <div class="step-head"><h2>A request that should succeed keeps returning <code>429</code> from <code>/api/auth/login</code></h2></div>
+  <p class="step-note">Hit repeatedly while preparing this guide — every deliberate rate-limit test (step 05, and the followup check in step 06) drains the 5-token bucket for whatever IP is making the requests, and that bucket is in-memory, per-server-process state (a Caffeine cache inside <code>LoginRateLimitFilter</code>, not backed by Postgres or anything else that survives a restart). Re-running steps out of order, or re-running this guide's login steps a second time in the same server session, hits the same drained bucket.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Fastest: restart the backend. A new process means a new, empty <code>Caffeine</code> cache, so every IP starts back at a full 5-token bucket. <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true
+mvn spring-boot:run -Dspring-boot.run.profiles=dev</pre></li>
+        <li>Alternative if the running process needs to stay up for some other reason: wait out the refill window. The response's <code>Retry-After</code> header (seconds) is the exact wait, and it counts down toward — not straight up to — the full 15 minutes from when the bucket first hit zero, so it's usually shorter than 900s by the time you read it.</li>
+        <li>This is per-IP, not global: a request from a different IP (e.g. through a different <code>X-Forwarded-For</code> value, if one were being sent) would have its own, unaffected bucket. All the <code>curl</code> calls in this guide come from the same machine, so they all share one bucket.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>H2 console login form won't connect / shows H2's own empty in-memory database</h2></div>
+  <p class="step-note">The H2 console's login form pre-fills its own defaults, which point at the base <code>application.yaml</code>'s H2 in-memory datasource (<code>jdbc:h2:mem:learning_db</code>) — but with the <code>dev</code> profile active, the app's actual bean-configured datasource is Postgres (<code>application-dev.yaml</code> overrides <code>spring.datasource.*</code>). The H2 console is a generic JDBC SQL client bundled with the app, not tied to only querying H2 databases; it just needs the right connection details typed in.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Before clicking Connect, overwrite all four login fields: Driver Class <code>org.postgresql.Driver</code>, JDBC URL <code>jdbc:postgresql://localhost:5432/enlightenment</code>, User Name <code>ahaspace</code>, Password <code>ahaspace</code>.</li>
+        <li><code>org.postgresql.Driver</code> is already on the classpath (it's the app's own production JDBC driver, from <code>spring.datasource.driver-class-name</code> in <code>application-dev.yaml</code>), so no extra dependency or setup is needed for the console to use it.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

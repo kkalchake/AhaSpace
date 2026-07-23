@@ -48,7 +48,7 @@ This starts a PostgreSQL 16 container (`ahaspace-postgres`, database `enlightenm
 ```bash
 cp src/main/resources/application-dev.yaml.example src/main/resources/application-dev.yaml
 ```
-Then edit `src/main/resources/application-dev.yaml` and set `gemini.api.key` to your own key. The database values already match the Docker Compose service, so leave them as-is.
+Then edit `src/main/resources/application-dev.yaml` and set `gemini.api.key` to your own key. The database values already match the Docker Compose service, so leave them as-is. `jwt.secret` is preset in the example file and is now mandatory — there is no application-level fallback, so any profile without it set will fail to start.
 
 #### Run Application
 ```bash

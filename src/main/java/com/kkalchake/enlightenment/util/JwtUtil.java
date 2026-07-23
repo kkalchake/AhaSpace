@@ -12,7 +12,7 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:default-dev-secret-key-must-be-32-chars-long}")
+    @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration:3600000}")

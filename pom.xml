@@ -94,6 +94,25 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Argon2 password hashing (SecurityConfig.passwordEncoder). Not actually BOM-managed
+		     by spring-boot-dependencies 3.2.0 (verified: no entry for this artifact) despite
+		     the plan calling it BOM-managed, so pinned explicitly to the latest stable release. -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.80</version>
+		</dependency>
+		<!-- Token-bucket rate limiting (LoginRateLimitFilter); not managed by the Spring Boot BOM -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.1</version>
+		</dependency>
+		<!-- Per-IP bucket cache backing LoginRateLimitFilter -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
