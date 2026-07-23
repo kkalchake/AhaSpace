@@ -10,3 +10,9 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+# No default here: an unset JWT_SECRET fails the app at boot instead of starting
+# with a weak, publicly known signing key. The dev profile supplies its own value.
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 3600000

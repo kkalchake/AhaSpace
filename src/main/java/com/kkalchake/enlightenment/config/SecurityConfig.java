@@ -1,6 +1,7 @@
 package com.kkalchake.enlightenment.config;
 
 import com.kkalchake.enlightenment.filter.JwtFilter;
+import com.kkalchake.enlightenment.filter.LoginRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,7 +11,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -18,6 +21,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Map;
 import java.util.List;
 
     @Configuration
@@ -26,10 +30,16 @@ import java.util.List;
     public class SecurityConfig {
 
         private final JwtFilter jwtFilter;
+        private final LoginRateLimitFilter loginRateLimitFilter;
 
         @Bean
         public PasswordEncoder passwordEncoder() {
-            return new BCryptPasswordEncoder();
+            DelegatingPasswordEncoder encoder = new DelegatingPasswordEncoder("argon2", Map.of(
+                    "argon2", Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8(),
+                    "bcrypt", new BCryptPasswordEncoder()
+            ));
+            encoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
+            return encoder;
         }
 
         @Bean
@@ -39,6 +49,7 @@ import java.util.List;
                     .csrf(AbstractHttpConfigurer::disable)
                     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                     .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                    .addFilterBefore(loginRateLimitFilter, JwtFilter.class)
                     .authorizeHttpRequests(auth -> auth
                             .requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers("/h2-console/**").permitAll()

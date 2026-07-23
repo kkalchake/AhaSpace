@@ -35,3 +35,6 @@ src/main/resources/application-dev.yaml
 .env
 context/
 src/main/resources/application-local.properties.example
+backup/
+docs/history/
+docs/restclient-migration-plan.md
