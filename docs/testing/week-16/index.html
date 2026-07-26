@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 16 — Production Deployment</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--owning-bg); color: var(--owning); }
+  .pill.skip { background: var(--border); color: var(--ink-dim); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .shot-caption { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin: 6px 0 0; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .status { color: var(--danger); font-weight: 700; }
+  .term .status.ok { color: var(--good); }
+  .term .status.warn { color: var(--owning); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .dialog-note {
+    margin-top: 14px; border: 1px dashed var(--inverse); background: var(--inverse-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .dialog-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--inverse); display: block; margin-bottom: 6px; }
+  .dialog-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .flag-note {
+    margin-top: 14px; border: 1px dashed var(--danger); background: var(--danger-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .flag-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--danger); display: block; margin-bottom: 6px; }
+  .flag-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .runbook-note {
+    margin-top: 14px; border: 1px dashed var(--owning); background: var(--owning-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .runbook-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--owning); display: block; margin-bottom: 6px; }
+  .runbook-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .runbook-step { margin-top: 28px; }
+  .runbook-step h3 { font-family: var(--font-mono); font-size: 14.5px; margin: 0 0 6px; }
+  .runbook-step p { font-size: 14px; color: var(--ink-dim); max-width: 68ch; margin: 0 0 8px; }
+  .runbook-step pre {
+    background: var(--card); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  .runbook-step code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 16 — Production deployment</p>
+  <h1>Local validation of the deploy plumbing, run end-to-end</h1>
+  <p class="sub">This week is different from every prior guide: the actual GCP/Vercel provisioning is a manual process the user runs themselves — nothing here invokes real cloud infrastructure, and no Cloud SQL instance or Vercel project exists yet. What <em>can</em> be verified locally, and what this guide actually tests, is the code that makes that provisioning work once it happens: the new <code>prod</code> Spring profile's wiring, the <code>CORS_ALLOWED_ORIGIN</code> and <code>VITE_API_URL</code> environment-variable overrides both apps now read, the <code>Dockerfile</code>'s ability to actually produce a runnable image, and — the same kind of check every prior week's guide has run — a full local regression pass proving none of this broke <code>AhaSpaceUI</code>'s existing register/login/chat/course-browsing flow. The manual <code>gcloud</code>/<code>vercel</code> commands themselves are reproduced at the end as a runbook, clearly separated from the automated checks above it.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01</td><td>Setup — Postgres, backend (<code>dev</code> profile), frontend, Docker daemon</td><td>All four reachable before any test step runs</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02</td><td><code>CORS_ALLOWED_ORIGIN</code> unset — default origin allowed, all others rejected</td><td><code>Access-Control-Allow-Origin: http://localhost:3000</code>; a different <code>Origin</code> gets <code>403</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">03</td><td><code>CORS_ALLOWED_ORIGIN</code> set — the env var, not the code, decides the allowed origin</td><td>New origin allowed, old default now rejected, no redeploy of code needed</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">04</td><td><code>docker build -t ahaspace-test .</code> from <code>AhaSpace/</code></td><td>Multi-stage build completes, <code>BUILD SUCCESS</code>, final image produced</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">05</td><td><code>docker run</code> the built image with <code>SPRING_PROFILES_ACTIVE=prod</code> and fake credentials</td><td>Spring context starts, <code>prod</code> profile active, fails only at the Cloud SQL connection step — not a Docker-level crash</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">06</td><td>Frontend dev server, no <code>VITE_API_URL</code> set</td><td>Falls back to <code>http://localhost:8080</code></td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">07</td><td><code>.env.local</code> sets <code>VITE_API_URL</code>, rebuild with <code>npm run build</code></td><td>Built bundle's fetch target actually changes — inlined at build time, verified in the compiled JS and over the wire</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08–11</td><td>Full regression: register, login, course browsing, chat</td><td>Register/login/courses unaffected by this week's refactor; chat's request routing is unaffected too (AI response itself needs a real Gemini key not present locally)</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">—</td><td>Deploy runbook (manual, user-executed)</td><td>Documentation only — not exercised by this guide</td><td><span class="pill skip">REFERENCE</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Everything this week's change touches, in the order it needs to come up. Four things running: the Docker daemon (needed for both Postgres and the Dockerfile build), Postgres itself, the backend on the existing <code>dev</code> profile (production's <code>prod</code> profile is deliberately <em>not</em> the one used for the regression pass — see the CORS and Docker sections below for where <code>prod</code> actually gets exercised), and the frontend dev server.</p>
+
+<details class="recreate setup">
+  <summary>Start Docker Desktop and Postgres</summary>
+  <div class="body">
+    <ol>
+      <li>Confirm the Docker daemon is actually up — a build or <code>docker compose</code> call against a stopped daemon fails with <code>Cannot connect to the Docker daemon</code>, not a helpful message about starting it:
+        <pre>docker info >/dev/null 2>&1 && echo "daemon up" || open -a Docker</pre>
+      </li>
+      <li>From the backend repo root:
+        <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+      </li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the backend on the <code>dev</code> profile</summary>
+  <div class="body">
+    <ol>
+      <li><code>src/main/resources/application-dev.yaml</code> is gitignored — copy it from the example if missing, and set a real <code>gemini.api.key</code> if you want AI chat responses to actually succeed (this guide's chat section runs without one — see step 11):
+        <pre>cp src/main/resources/application-dev.yaml.example src/main/resources/application-dev.yaml</pre>
+      </li>
+      <li><pre>./mvnw spring-boot:run -Dspring-boot.run.profiles=dev</pre>
+        Wait for <code>SERVER IS LIVE on http://localhost:8080!</code> before sending any request below.</li>
+    </ol>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the frontend</summary>
+  <div class="body">
+    <ol>
+      <li>From <code>AhaSpaceUI/</code>: <pre>npm install
+npm run dev</pre></li>
+      <li><code>vite.config.js</code> pins the dev server to port 3000 with <code>strictPort: true</code> — this isn't new this week, but it matters more now: the backend's default CORS origin (<code>cors.allowed-origin</code>'s fallback in <code>application.yaml</code>) is still hardcoded to expect exactly <code>http://localhost:3000</code>, so a silent fallback to 3001 would break every request with a CORS error that has nothing to do with this week's changes.</li>
+    </ol>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== CORS ENV VAR ============================== -->
+<details class="group" open>
+<summary class="group-label">New behavior: CORS origin via <code>CORS_ALLOWED_ORIGIN</code></summary>
+<p class="group-intro"><code>SecurityConfig.java</code>'s <code>corsConfigurationSource()</code> used to hardcode <code>configuration.setAllowedOrigins(List.of("http://localhost:3000"))</code> — the only frontend that could ever call this API was baked into the compiled code. It now reads a <code>@Value("${cors.allowed-origin}")</code>-bound field instead, and the base <code>application.yaml</code> supplies <code>cors.allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:3000}</code> — an env var with the same old value as its default, so nothing changes for anyone who doesn't set it. This is the exact same <code>@Value</code> + env-var-with-default mechanism <code>application-prod.yaml</code> relies on for its Cloud SQL and Gemini settings (see the Docker section below) — proving it here, against a real running server and a real HTTP response header, is a faithful stand-in for a mechanism that can't be exercised against real Cloud SQL locally.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Default behavior — no <code>CORS_ALLOWED_ORIGIN</code> set</h2></div>
+  <p class="step-note">Backend started with no <code>CORS_ALLOWED_ORIGIN</code> in the environment, so <code>cors.allowed-origin</code> resolves to its fallback, <code>http://localhost:3000</code>. Two real preflight (<code>OPTIONS</code>) requests against the same running server, same endpoint, different <code>Origin</code> headers.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — preflight from the frontend's real origin</div><pre>$ curl -s -i -X OPTIONS http://localhost:8080/api/courses \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET"
+<span class="status ok">HTTP/1.1 200</span>
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+<span class="status ok">Access-Control-Allow-Origin: http://localhost:3000</span>
+Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Content-Length: 0</pre></div>
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;">
+  <div class="term"><div class="term-head">terminal — preflight from a different origin, same server, same moment</div><pre>$ curl -s -i -X OPTIONS http://localhost:8080/api/courses \
+  -H "Origin: http://localhost:5555" \
+  -H "Access-Control-Request-Method: GET"
+<span class="status">HTTP/1.1 403</span>
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Transfer-Encoding: chunked
+
+<span class="status">Invalid CORS request</span></pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">This confirms the fallback default reproduces the exact old hardcoded behavior — one allowed origin, everything else rejected at the CORS layer before the request ever reaches a controller.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Make sure no <code>CORS_ALLOWED_ORIGIN</code> is set: <pre>unset CORS_ALLOWED_ORIGIN</pre></li>
+        <li>With the backend running (Setup above), send both <code>curl</code> calls above.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Setting <code>CORS_ALLOWED_ORIGIN</code> — the env var actually decides, not the code</h2></div>
+  <p class="step-note">Same backend, restarted with <code>CORS_ALLOWED_ORIGIN=https://ahaspace-ui.vercel.app</code> set (a placeholder standing in for a real future Vercel URL — see the Deploy Runbook below for where this value comes from for real). No code changed between this step and the one above; only the environment did.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — preflight from the new allowed origin</div><pre>$ CORS_ALLOWED_ORIGIN=https://ahaspace-ui.vercel.app \
+  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+...
+$ curl -s -i -X OPTIONS http://localhost:8080/api/courses \
+  -H "Origin: https://ahaspace-ui.vercel.app" \
+  -H "Access-Control-Request-Method: GET"
+<span class="status ok">HTTP/1.1 200</span>
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+<span class="status ok">Access-Control-Allow-Origin: https://ahaspace-ui.vercel.app</span>
+Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Content-Length: 0</pre></div>
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;">
+  <div class="term"><div class="term-head">terminal — the OLD default origin, now rejected by the same running server</div><pre>$ curl -s -i -X OPTIONS http://localhost:8080/api/courses \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET"
+<span class="status">HTTP/1.1 403</span>
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Transfer-Encoding: chunked
+
+<span class="status">Invalid CORS request</span></pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">This is the whole point of the change: <code>localhost:3000</code>, which was <em>unconditionally</em> allowed before this week (hardcoded in compiled code), is now rejected the moment a different <code>CORS_ALLOWED_ORIGIN</code> is set — because it's no longer special-cased anywhere, it's just whatever the current value of one env var says. This is exactly the redeploy in Backend step F of the Deploy Runbook below: swapping <code>CORS_ALLOWED_ORIGIN</code> from a placeholder to the real Vercel URL needs no code change and no rebuild, only <code>gcloud run services update --update-env-vars</code>.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Stop the backend, restart it with the env var set: <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true
+CORS_ALLOWED_ORIGIN=https://ahaspace-ui.vercel.app \
+  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev</pre></li>
+        <li>Send both <code>curl</code> calls above.</li>
+        <li>Restart the backend once more with no <code>CORS_ALLOWED_ORIGIN</code> set before continuing to the regression section below — the frontend dev server at <code>localhost:3000</code> needs the default origin allowed again.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== DOCKER BUILD ============================== -->
+<details class="group" open>
+<summary class="group-label">Docker build verification</summary>
+<p class="group-intro">Docker Desktop was available locally (<code>docker --version</code> → <code>Docker version 29.1.2</code>), so this section ran for real — a genuine <code>docker build</code> and <code>docker run</code>, not a description of what should happen. If Docker isn't installed when following this guide, skip straight to the "If Docker isn't available" note at the end of this section.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Multi-stage build — real output, full run</h2></div>
+  <p class="step-note">From <code>AhaSpace/</code>. The first stage (<code>maven:3.9-eclipse-temurin-21</code>) runs <code>./mvnw -B clean package -DskipTests</code> to produce the jar; the second (<code>eclipse-temurin:21-jre-alpine</code>) copies only that jar in. Tests are skipped here deliberately — they already ran and passed in the <code>./mvnw -o test</code> step Phase 6 verification captured (111/111); re-running them inside the image build would just slow down every deploy for no new information.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — abbreviated, full log is ~9 seconds of Maven dependency resolution + compile</div><pre>$ docker build -t ahaspace-test .
+...
+#12 [build 4/6] RUN ./mvnw -B dependency:go-offline
+...
+#14 [build 6/6] RUN ./mvnw -B clean package -DskipTests
+#14 7.610 [INFO] skip non existing resourceDirectory /app/src/test/resources
+#14 8.061 [INFO] --- surefire:3.1.2:test (default-test) @ enlightenment ---
+#14 8.061 [INFO] Tests are skipped.
+#14 8.135 [INFO] Building jar: /app/target/enlightenment-0.0.1-SNAPSHOT.jar
+#14 8.345 [INFO] Replacing main artifact /app/target/enlightenment-0.0.1-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+<span class="status ok">#14 8.345 [INFO] BUILD SUCCESS</span>
+#14 DONE 8.4s
+
+#15 [stage-1 3/3] COPY --from=build /app/target/enlightenment-0.0.1-SNAPSHOT.jar app.jar
+#15 DONE 0.1s
+
+#16 exporting to image
+#16 naming to docker.io/library/ahaspace-test:latest done
+#16 DONE 1.5s</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">Final image: <code>429MB</code> (<code>docker images ahaspace-test</code>) — one JRE plus one jar, not the ~1GB+ Maven/JDK build toolchain the first stage used, confirming the multi-stage decision from <code>decisions.md</code> actually paid off rather than being purely aspirational.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>cd AhaSpace
+docker build -t ahaspace-test .
+docker images ahaspace-test</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2>Running the built image — gets to Spring Boot startup, fails only at Cloud SQL</h2></div>
+  <p class="step-note">The task here is narrow and deliberate: confirm the image <em>runs</em> and the <code>prod</code> profile <em>activates</em> — not that it fully boots, which is impossible without a real Cloud SQL instance and real GCP credentials, neither of which exist yet. Ran with <code>SPRING_PROFILES_ACTIVE=prod</code> and syntactically-valid but fake values for every required env var (<code>JWT_SECRET</code>, <code>DB_PASSWORD</code>, <code>CLOUD_SQL_CONNECTION_NAME=fake:fake:fake</code>, <code>GEMINI_API_KEY</code>) — enough for Spring's placeholder resolution to succeed, not enough for an actual database connection to succeed.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — startup, profile activation, port binding (all succeed)</div><pre>$ docker run -e SPRING_PROFILES_ACTIVE=prod \
+  -e JWT_SECRET=test-secret-at-least-32-characters-long \
+  -e DB_PASSWORD=x -e CLOUD_SQL_CONNECTION_NAME=fake:fake:fake \
+  -e GEMINI_API_KEY=fake ahaspace-test
+...
+2026-07-23 22:05:21.830 INFO  c.k.e.EnlightenmentApplication - Starting EnlightenmentApplication v0.0.1-SNAPSHOT using Java 21.0.11
+<span class="status ok">2026-07-23 22:05:21.830 INFO  c.k.e.EnlightenmentApplication - The following 1 profile is active: "prod"</span>
+2026-07-23 22:05:22.483 INFO  o.s.b.w.e.tomcat.TomcatWebServer - <span class="status ok">Tomcat initialized with port 8080 (http)</span>
+2026-07-23 22:05:23.263 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...</pre></div>
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;">
+  <div class="term"><div class="term-head">terminal — fails here, at the Cloud SQL connection attempt (expected, correct)</div><pre>2026-07-23 22:05:23.818 <span class="status">ERROR</span> com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization.
+org.postgresql.util.PSQLException: ...
+Caused by: <span class="status">java.lang.RuntimeException: Unable to obtain credentials to communicate with the Cloud SQL API</span>
+	at com.google.cloud.sql.core.ApplicationDefaultCredentialFactory.getCredentials(...)
+	at com.google.cloud.sql.postgres.SocketFactory.createSocket(SocketFactory.java:81)
+	at org.postgresql.core.v3.ConnectionFactoryImpl.tryConnect(...)
+Caused by: <span class="status">java.io.IOException: Your default credentials were not found.</span> To set up Application
+Default Credentials for your environment, see https://cloud.google.com/docs/authentication/external/set-up-adc.
+...
+2026-07-23 22:05:25.233 <span class="status">ERROR o.s.boot.SpringApplication - Application run failed</span>
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' ...</pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">Read bottom-to-top, this is exactly the right failure at exactly the right layer: <code>"The following 1 profile is active: prod"</code> proves <code>SPRING_PROFILES_ACTIVE=prod</code> selected <code>application-prod.yaml</code> correctly; <code>Tomcat initialized with port 8080</code> proves the container itself, the jar, and the JRE are all fine — this is not a Docker-level failure (bad <code>ENTRYPOINT</code>, missing jar, wrong Java version, port misconfiguration). The failure is specifically <code>postgres-socket-factory</code> trying to authenticate to the real Cloud SQL Admin API using Application Default Credentials, which only exist inside a real GCP environment (or after a local <code>gcloud auth application-default login</code>, deliberately not done here since this guide isn't supposed to touch real GCP). This is the correct, expected failure mode for "an image built and run entirely outside GCP" and is not something to fix before shipping — it resolves itself the moment the image actually runs on Cloud Run with <code>--add-cloudsql-instances</code>, per Backend step E of the runbook below.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li><pre>docker run -e SPRING_PROFILES_ACTIVE=prod \
+  -e JWT_SECRET=test-secret-at-least-32-characters-long \
+  -e DB_PASSWORD=x -e CLOUD_SQL_CONNECTION_NAME=fake:fake:fake \
+  -e GEMINI_API_KEY=fake ahaspace-test</pre></li>
+        <li>Expect it to print <code>The following 1 profile is active: "prod"</code>, then <code>Tomcat initialized with port 8080</code>, then fail a few seconds later on the Cloud SQL connection. Any other failure shape (image won't start at all, <code>exec format error</code>, immediate crash before the profile line prints) means the Docker build itself is broken, not this expected credentials gap.</li>
+        <li>Clean up: <pre>docker rm -f $(docker ps -aq --filter ancestor=ahaspace-test) 2>/dev/null; true
+docker rmi ahaspace-test</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<div class="dialog-note">
+  <span class="k">If Docker isn't available locally</span>
+  Skip this section only — nothing else in this guide depends on it. Once Docker is installed, the two commands to run are <code>docker build -t ahaspace-test .</code> from <code>AhaSpace/</code> (expect <code>BUILD SUCCESS</code> and a final image around 400-450MB), then <code>docker run</code> it with the fake env vars shown in step 05 above (expect it to reach <code>Tomcat initialized with port 8080</code> before failing on the Cloud SQL connection — any earlier or different failure means something about the <code>Dockerfile</code> itself, not the expected credentials gap, is broken).
+</div>
+
+</details>
+
+<!-- ============================== FRONTEND API_BASE_URL ============================== -->
+<details class="group" open>
+<summary class="group-label">New behavior: <code>API_BASE_URL</code> fallback and override</summary>
+<p class="group-intro">New <code>src/config.js</code>: <code>export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'</code>. Every one of the 7 source files that used to hardcode <code>http://localhost:8080</code> in a <code>fetch()</code> call now imports this and interpolates it instead. <code>import.meta.env.VITE_API_URL</code> is Vite's build-time environment variable substitution — it's not read at runtime like a Node <code>process.env</code> lookup, it's a literal text replacement Vite performs while bundling, which is why the override step below requires an actual rebuild, not just a page refresh.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2>Fallback — no <code>VITE_API_URL</code>, dev server hits <code>localhost:8080</code></h2></div>
+  <p class="step-note">No <code>.env.local</code> exists yet at this point. Real network requests captured from the running dev server (<code>localhost:3000</code>) during the register/login flow below — every one goes to the bare <code>localhost:8080</code> fallback baked into <code>config.js</code>.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">requests captured from the browser during register + login (no .env.local present)</div><pre>POST http://localhost:8080/api/auth/register
+POST http://localhost:8080/api/auth/login
+GET  http://localhost:8080/api/courses
+GET  http://localhost:8080/api/chat/sessions</pre></div>
+  </div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Confirm no <code>.env.local</code> exists in <code>AhaSpaceUI/</code> (<code>ls .env.local</code> should fail), start the dev server, open browser devtools' Network tab, and use the app normally — every API call's target host should read <code>localhost:8080</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Override — <code>.env.local</code> + rebuild actually changes the compiled target</h2></div>
+  <p class="step-note">Created <code>AhaSpaceUI/.env.local</code> with <code>VITE_API_URL=http://127.0.0.1:8080</code> — same backend, deliberately a different-looking host string (<code>127.0.0.1</code> instead of <code>localhost</code>) purely so the change is unambiguous in the built output, not because the two hosts behave differently here. Ran <code>npm run build</code>, then grepped the compiled bundle directly, before even loading a browser — proof this is a compile-time substitution, not something a screenshot alone could distinguish from a runtime lookup.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">terminal — proving the substitution happened inside the built JS itself</div><pre>$ cat .env.local
+VITE_API_URL=http://127.0.0.1:8080
+
+$ npm run build
+✓ built in 205ms
+
+$ grep -o "127.0.0.1:8080" dist/assets/index-*.js | wc -l
+<span class="status ok">       2</span>
+$ grep -o "localhost:8080" dist/assets/index-*.js | wc -l
+<span class="status ok">       0</span></pre></div>
+  </div>
+  <p class="step-note" style="margin-top:14px;">Then served the real production build with <code>npm run preview --port 4173</code> (backend's <code>CORS_ALLOWED_ORIGIN</code> temporarily pointed at <code>http://localhost:4173</code> for this one check, same env-var mechanism as step 03 above) and logged in through it for real — this is the actual compiled app talking to the actual backend, not a mocked request.</p>
+  <div class="shot-wrap">
+  <div class="term"><div class="term-head">request captured from the browser while running the preview build</div><pre><span class="status ok">POST http://127.0.0.1:8080/api/auth/login</span>   ← was http://localhost:8080 before the rebuild</pre></div>
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/11-preview-build-login-attempt.png" alt="AhaSpace home page showing 'Welcome back, week16_tester@example.com!' after logging in through the npm run preview production build, which was compiled with VITE_API_URL=http://127.0.0.1:8080"></div>
+  <p class="step-note" style="margin-top:14px;">Full round trip succeeded — login through the rebuilt bundle reached the backend at the overridden host, got a valid JWT back, and redirected home exactly like every other login in this guide. This is the same mechanism Frontend step 4 of the Deploy Runbook below relies on: <code>vercel env add VITE_API_URL production</code> followed by <code>vercel --prod</code> is this exact <code>.env.local</code> + rebuild sequence, just with Vercel running the build instead of a local <code>npm run build</code>.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li><pre>echo "VITE_API_URL=http://127.0.0.1:8080" > .env.local
+npm run build
+grep -c "127.0.0.1:8080" dist/assets/index-*.js</pre></li>
+        <li>Serve the build and temporarily widen backend CORS to match: <pre># in AhaSpace/, restart the backend:
+CORS_ALLOWED_ORIGIN=http://localhost:4173 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+
+# in AhaSpaceUI/, in another terminal:
+npm run preview -- --port 4173</pre></li>
+        <li>Open <code>http://localhost:4173/login</code>, log in with an already-registered account, watch the Network tab for the request host.</li>
+        <li>Clean up afterward: delete <code>.env.local</code>, restart the backend with no <code>CORS_ALLOWED_ORIGIN</code> set (needed again for the plain <code>localhost:3000</code> dev server below).</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== FULL REGRESSION ============================== -->
+<details class="group" open>
+<summary class="group-label">Full regression: register, login, chat, course browsing</summary>
+<p class="group-intro">The same kind of pass every prior week's guide has run, and the most important section for answering one question: did refactoring 10 hardcoded URLs into one shared <code>config.js</code> constant, across 7 source files and 3 test files, change any actual behavior? Everything below runs against the plain <code>dev</code>-profile backend (no CORS override, no <code>.env.local</code> — the default fallback path from step 06) through the normal <code>npm run dev</code> server at <code>localhost:3000</code>, exactly like every prior week.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Register — real account, real redirect</h2></div>
+  <p class="step-note"><code>POST /api/auth/register</code> through <code>Register.jsx</code>, which now imports <code>API_BASE_URL</code> from <code>config.js</code> instead of hardcoding the URL. A 201 response auto-logs-in (same as every prior week) and redirects to the home page.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-register-form.png" alt="AhaSpace registration form filled in with email week16_register_demo@example.com and matching password/confirm-password fields"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/02-register-success-redirect.png" alt="AhaSpace home page after successful registration, showing 'Welcome back, week16_register_demo@example.com!' and navigation links for AI Chat, Courses, and Logout"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Go to <code>/register</code>, fill in a new email, a password 6+ characters, matching confirm-password, submit. Expect redirect to <code>/</code> with a "Welcome back" message.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>Login — two-step flow, unchanged</h2></div>
+  <p class="step-note"><code>Login.jsx</code>'s two-step email-then-password flow (from Week 14) is untouched by this week's changes beyond the one line that builds the fetch URL. Logged in as the <code>week16_tester@example.com</code> account used throughout the rest of this guide.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/03-login-email-step.png" alt="Login form, step one, email field filled with week16_tester@example.com, Continue button"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/04-login-password-step.png" alt="Login form, step two, password field revealed and filled, Sign In button"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/05-login-success-home.png" alt="AhaSpace home page after login, Welcome back message for week16_tester@example.com"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Go to <code>/login</code>, enter a registered email, click Continue, enter the password, click Sign In. Expect redirect to <code>/</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>Course browsing — list and drill into sections</h2></div>
+  <p class="step-note">There's no course-seeding endpoint or startup data (by design, same as every prior week touching this table) — a fresh dev database shows "No courses available yet" on <code>/courses</code>, which is itself the correct, unbroken behavior for <code>CourseList.jsx</code>'s <code>GET ${API_BASE_URL}/api/courses</code> call. One course and section were inserted directly via SQL (same approach Week 9 and Week 10 used) purely so this guide could also show the drill-down into <code>CourseSections.jsx</code>, which has its own independent <code>API_BASE_URL</code> import.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/06-course-list.png" alt="Courses page showing one course card titled Week 16 Regression Course"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/07-course-sections.png" alt="Sections page for the Week 16 Regression Course, showing one section titled Section 1"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Seed one course and section (skip if any already exist in your dev Postgres volume):
+          <pre>docker exec ahaspace-postgres psql -U ahaspace -d enlightenment -c \
+  "INSERT INTO courses (title, description) VALUES ('Test Course', 'Seeded for testing');"
+docker exec ahaspace-postgres psql -U ahaspace -d enlightenment -c \
+  "INSERT INTO sections (content, course_id) VALUES ('Test section content.', 1);"</pre>
+        </li>
+        <li>Go to <code>/courses</code> while logged in, confirm the course card renders, click into it, confirm the section renders.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>Chat — request routing works, AI response needs a real key (unrelated to this week)</h2></div>
+  <p class="step-note">Sending a chat message hits <code>POST ${API_BASE_URL}/api/chat</code> — the request itself reaches the backend correctly (same host, same CORS pass, same JWT auth as every other call in this guide). What fails is the AI response: this local dev environment's <code>application-dev.yaml</code> has <code>gemini.api.key: YOUR_GEMINI_API_KEY_HERE</code>, a placeholder, not a real Gemini key. This is a pre-existing local-setup gap documented since Week 10's guide ("Needs a real <code>gemini.api.key</code> configured... without one this returns 500 instead"), not something Week 16 introduced or could fix — it's orthogonal to the URL-routing refactor this week actually made.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/08-chat-empty.png" alt="AI Chat page, empty state, Start a conversation by sending a message below"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/09-chat-message-typed.png" alt="AI Chat page with 'What is photosynthesis?' typed into the message input, not yet sent"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/10-chat-after-send.png" alt="AI Chat page after sending the message, showing the user's message bubble and a red 'Failed to get AI response' banner"></div>
+  <p class="step-note" style="margin-top:14px;">The user's own message bubble rendering, with a timestamp, confirms the <code>POST</code> reached the backend and got a response back (an error response, but a real HTTP round trip, not a network-level failure) — the request-routing refactor this week made is provably fine. To see a real AI response instead of this error, follow the Setup section's note about setting a real <code>gemini.api.key</code> in <code>application-dev.yaml</code>, exactly as every prior week's guide has required.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Go to <code>/chat</code> while logged in, type any message, click Send. Without a real Gemini key configured, expect a "Failed to get AI response" banner — this is the correct, pre-existing behavior, not a regression.</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== DEPLOY RUNBOOK ============================== -->
+<details class="group" open>
+<summary class="group-label">Deploy Runbook (manual, user-executed — not verified by this guide)</summary>
+<p class="group-intro">Everything in this section is documentation, reproduced from <code>plan.md</code> for a single reference point — none of it was run, and none of it can be run from this guide: it provisions real GCP and Vercel resources under the user's own account and billing. Follow it in order; the deploy sequence resolves a circular dependency (the backend's CORS needs the frontend's URL, the frontend's API base needs the backend's URL, and neither exists until the other deploys once) by deploying the backend first with a placeholder CORS origin, then the frontend against that backend's real URL, then redeploying the backend with the frontend's real URL.</p>
+
+<div class="runbook-step">
+  <h3>Backend A — Enable required GCP APIs</h3>
+  <pre>gcloud config set project PROJECT_ID
+gcloud services enable sqladmin.googleapis.com run.googleapis.com secretmanager.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com</pre>
+</div>
+
+<div class="runbook-step">
+  <h3>Backend B — Create the Cloud SQL instance and database</h3>
+  <pre>gcloud sql instances create ahaspace-db \
+  --database-version=POSTGRES_16 --tier=db-f1-micro --region=REGION
+gcloud sql databases create ahaspace --instance=ahaspace-db
+gcloud sql instances describe ahaspace-db --format='value(connectionName)'</pre>
+  <p>Record the output as <code>CLOUD_SQL_CONNECTION_NAME</code> (<code>PROJECT_ID:REGION:ahaspace-db</code>) — this is the exact value <code>application-prod.yaml</code>'s <code>cloudSqlInstance=</code> JDBC parameter reads, verified against the real file in the Docker section above.</p>
+</div>
+
+<div class="runbook-step">
+  <h3>Backend C — Create the least-privilege app DB user</h3>
+  <pre>gcloud sql users create ahaspace_app --instance=ahaspace-db --password='&lt;GENERATED_DB_PASSWORD&gt;'</pre>
+  <p>Then, connected as <code>postgres</code> (<code>gcloud sql connect ahaspace-db --user=postgres</code>), grant only on the <code>ahaspace</code> database:</p>
+  <pre>GRANT ALL PRIVILEGES ON DATABASE ahaspace TO ahaspace_app;
+GRANT ALL ON SCHEMA public TO ahaspace_app;</pre>
+</div>
+
+<div class="runbook-step">
+  <h3>Backend D — Create Secret Manager secrets</h3>
+  <pre>printf '%s' '&lt;GENERATED_DB_PASSWORD&gt;' | gcloud secrets create db-password  --data-file=-
+printf '%s' '&lt;JWT_SECRET_32+_chars&gt;'   | gcloud secrets create jwt-secret   --data-file=-
+printf '%s' '&lt;GEMINI_API_KEY&gt;'         | gcloud secrets create gemini-api-key --data-file=-</pre>
+  <p>Grant the Cloud Run runtime service account <code>roles/secretmanager.secretAccessor</code> on each of the three secrets.</p>
+</div>
+
+<div class="runbook-step">
+  <h3>Backend E — First Cloud Run deploy, placeholder CORS</h3>
+  <pre>gcloud run deploy ahaspace \
+  --source AhaSpace \
+  --region REGION --allow-unauthenticated \
+  --add-cloudsql-instances PROJECT_ID:REGION:ahaspace-db \
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod,CLOUD_SQL_CONNECTION_NAME=PROJECT_ID:REGION:ahaspace-db,CORS_ALLOWED_ORIGIN=https://placeholder.vercel.app \
+  --set-secrets JWT_SECRET=jwt-secret:latest,GEMINI_API_KEY=gemini-api-key:latest,DB_PASSWORD=db-password:latest</pre>
+  <p>Record the printed service URL as <code>CLOUD_RUN_URL</code>. This is the deploy where the Docker section's local "credentials not found" failure above resolves for real — <code>--add-cloudsql-instances</code> gives the running container the Cloud SQL Auth Proxy connection the socket factory needs, which a local <code>docker run</code> can never provide.</p>
+</div>
+
+<div class="runbook-step">
+  <h3>Frontend — Deploy to Vercel with the real backend URL</h3>
+  <pre>cd AhaSpaceUI
+vercel login
+vercel link
+vercel env add VITE_API_URL production   # paste CLOUD_RUN_URL from step E, no trailing slash
+vercel --prod</pre>
+  <p><code>VITE_API_URL</code> must be set <strong>before</strong> <code>vercel --prod</code> runs its build — this is the exact same build-time-inlining behavior proven locally in step 07 above, just with Vercel's build server running <code>npm run build</code> instead of a local one. Record the printed production URL as <code>VERCEL_URL</code>.</p>
+</div>
+
+<div class="runbook-step">
+  <h3>Backend F — Redeploy with the real CORS origin</h3>
+  <pre>gcloud run services update ahaspace --region REGION \
+  --update-env-vars CORS_ALLOWED_ORIGIN=https://&lt;real-vercel-url&gt;</pre>
+  <p>This single flag change is exactly what step 03 above proved locally: no code change, no rebuild, just a new value for the same env var <code>SecurityConfig</code> already reads.</p>
+</div>
+
+<div class="runbook-step">
+  <h3>G — Smoke test against the live app</h3>
+  <p>Against <code>VERCEL_URL</code>: register, log in, send a chat message (a real Gemini key is in Secret Manager by this point, so this should succeed unlike step 11 above), browse courses. This is the one step in the runbook that's a direct rerun of this guide's own regression section (steps 08-11), just pointed at the real deployed URLs instead of <code>localhost</code>.</p>
+</div>
+
+<div class="runbook-note">
+  <span class="k">Why none of this ran automatically</span>
+  Every command above provisions real, billed GCP resources (a Cloud SQL instance, Secret Manager entries, a Cloud Run service) or a real Vercel deployment under the user's own accounts. <code>decisions.md</code> is explicit that the user runs these themselves — Claude's role was providing the exact commands, not executing them. Nothing in this guide's automated sections above required or assumed any of these resources exist.
+</div>
+
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Common errors and suggested solutions</summary>
+<p class="group-intro">Stale-process and port-conflict entries carried forward from <a href="../week-15/">Week 15's Troubleshooting section</a> still apply unchanged and aren't repeated here. Everything below is specific to this week's changes.</p>
+
+<section class="step">
+  <div class="step-head"><h2><code>Invalid CORS request</code> from the frontend dev server after testing the CORS override</h2></div>
+  <p class="step-note">If step 03 or step 07's backend restart (with <code>CORS_ALLOWED_ORIGIN</code> set to something other than <code>http://localhost:3000</code>) is still running when the regression section's <code>npm run dev</code> frontend tries to talk to it, every request fails CORS — the backend is correctly enforcing whatever origin it was last started with, and it's no longer the frontend's.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">Restart the backend with no <code>CORS_ALLOWED_ORIGIN</code> in the environment: <pre>lsof -ti:8080 | xargs kill -9 2>/dev/null; true
+unset CORS_ALLOWED_ORIGIN
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2><code>Cannot connect to the Docker daemon</code> when running <code>docker build</code> or <code>docker compose up</code></h2></div>
+  <p class="step-note">Docker Desktop isn't just installed, it needs to actually be running — <code>docker --version</code> succeeding only proves the CLI binary exists, not that the daemon it talks to is up. Hit this directly while preparing this guide: <code>docker compose up -d</code> failed with <code>dial unix /Users/.../docker.sock: connect: no such file or directory</code> until Docker Desktop was launched.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body"><pre>open -a Docker
+# then wait for the daemon:
+until docker info >/dev/null 2>&1; do sleep 2; done</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Built frontend bundle still contains the old <code>localhost:8080</code> host string</h2></div>
+  <p class="step-note"><code>import.meta.env.VITE_API_URL</code> is substituted once, at build time — <code>.env.local</code> created or edited <em>after</em> <code>npm run build</code> already ran has no effect on the existing <code>dist/</code> output, and a running <code>npm run dev</code> or <code>npm run preview</code> process started before the file changed won't pick it up either.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">
+      <ol>
+        <li>Confirm <code>.env.local</code> exists and is correct <strong>before</strong> building: <pre>cat .env.local</pre></li>
+        <li>Rebuild: <pre>npm run build
+grep -c "localhost:8080" dist/assets/index-*.js   # expect 0 if VITE_API_URL is set to something else</pre></li>
+        <li>If serving via <code>npm run preview</code>, restart that process after every rebuild — it serves whatever was in <code>dist/</code> at the moment it started, not live.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Chat always returns <code>Failed to get AI response</code> locally</h2></div>
+  <p class="step-note">Expected, not a bug — see step 11 above. <code>application-dev.yaml</code>'s <code>gemini.api.key</code> is a placeholder (<code>YOUR_GEMINI_API_KEY_HERE</code>) unless it's been manually edited to a real key. This has been true since Week 10 and is unrelated to this week's URL-routing refactor.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">Edit <code>src/main/resources/application-dev.yaml</code>, set <code>gemini.api.key</code> to a real Gemini API key, restart the backend.</div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

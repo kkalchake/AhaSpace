@@ -3,6 +3,7 @@ package com.kkalchake.enlightenment.config;
 import com.kkalchake.enlightenment.filter.JwtFilter;
 import com.kkalchake.enlightenment.filter.LoginRateLimitFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,6 +32,9 @@ import java.util.List;
 
         private final JwtFilter jwtFilter;
         private final LoginRateLimitFilter loginRateLimitFilter;
+
+        @Value("${cors.allowed-origin}")
+        private String corsAllowedOrigin;
 
         @Bean
         public PasswordEncoder passwordEncoder() {
@@ -64,7 +68,7 @@ import java.util.List;
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
             CorsConfiguration configuration = new CorsConfiguration();
-            configuration.setAllowedOrigins(List.of("http://localhost:3000")); // React Frontend
+            configuration.setAllowedOrigins(List.of(corsAllowedOrigin));
             configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
             configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
             UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
