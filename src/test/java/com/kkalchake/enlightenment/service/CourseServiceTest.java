@@ -1,10 +1,13 @@
 package com.kkalchake.enlightenment.service;
 
 import com.kkalchake.enlightenment.dto.CourseDto;
+import com.kkalchake.enlightenment.dto.PhaseDto;
 import com.kkalchake.enlightenment.dto.SectionDto;
 import com.kkalchake.enlightenment.model.Course;
+import com.kkalchake.enlightenment.model.Phase;
 import com.kkalchake.enlightenment.model.Section;
 import com.kkalchake.enlightenment.repository.CourseRepository;
+import com.kkalchake.enlightenment.repository.PhaseRepository;
 import com.kkalchake.enlightenment.repository.SectionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -23,13 +27,14 @@ import static org.mockito.Mockito.when;
 class CourseServiceTest {
 
     @Mock private CourseRepository courseRepository;
+    @Mock private PhaseRepository phaseRepository;
     @Mock private SectionRepository sectionRepository;
 
     private CourseService courseService;
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseService(courseRepository, sectionRepository);
+        courseService = new CourseService(courseRepository, phaseRepository, sectionRepository);
     }
 
     @Test
@@ -61,35 +66,118 @@ class CourseServiceTest {
     }
 
     @Test
-    void getSectionsForCourse_courseNotFound_throwsNotFound() {
+    void getPhasesForCourse_courseNotFound_throwsNotFound() {
         when(courseRepository.existsById(99L)).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> courseService.getSectionsForCourse(99L));
+                () -> courseService.getPhasesForCourse(99L));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     @Test
-    void getSectionsForCourse_courseExists_returnsMappedDtos() {
-        Section s1 = new Section();
-        s1.setId(1L);
-        s1.setContent("Section 1");
+    void getPhasesForCourse_courseExists_returnsMappedDtos() {
+        Phase p1 = new Phase();
+        p1.setId(1L);
+        p1.setTitle("Phase 0: Setup & Tooling");
+        p1.setOrderIndex(0);
+        p1.setDescription("Phase description");
 
         when(courseRepository.existsById(1L)).thenReturn(true);
-        when(sectionRepository.findByCourseId(1L)).thenReturn(List.of(s1));
+        when(phaseRepository.findByCourseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of(p1));
 
-        List<SectionDto> result = courseService.getSectionsForCourse(1L);
+        List<PhaseDto> result = courseService.getPhasesForCourse(1L);
 
         assertEquals(1, result.size());
-        assertEquals("Section 1", result.get(0).getContent());
+        assertEquals("Phase 0: Setup & Tooling", result.get(0).getTitle());
+        assertEquals(0, result.get(0).getOrderIndex());
         assertEquals(1L, result.get(0).getCourseId());
     }
 
     @Test
-    void getSectionsForCourse_courseExistsNoSections_returnsEmpty() {
+    void getPhasesForCourse_courseExistsNoPhases_returnsEmpty() {
         when(courseRepository.existsById(1L)).thenReturn(true);
-        when(sectionRepository.findByCourseId(1L)).thenReturn(List.of());
+        when(phaseRepository.findByCourseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of());
 
-        assertTrue(courseService.getSectionsForCourse(1L).isEmpty());
+        assertTrue(courseService.getPhasesForCourse(1L).isEmpty());
+    }
+
+    @Test
+    void getSectionsForPhase_courseNotFound_throwsNotFound() {
+        when(courseRepository.existsById(99L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getSectionsForPhase(99L, 1L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getSectionsForPhase_phaseNotFound_throwsNotFound() {
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getSectionsForPhase(1L, 99L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getSectionsForPhase_phaseBelongsToDifferentCourse_throwsNotFound() {
+        Course otherCourse = new Course();
+        otherCourse.setId(2L);
+
+        Phase phase = new Phase();
+        phase.setId(1L);
+        phase.setCourse(otherCourse);
+
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findById(1L)).thenReturn(Optional.of(phase));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getSectionsForPhase(1L, 1L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getSectionsForPhase_phaseExists_returnsMappedDtos() {
+        Course course = new Course();
+        course.setId(1L);
+
+        Phase phase = new Phase();
+        phase.setId(1L);
+        phase.setCourse(course);
+
+        Section s1 = new Section();
+        s1.setId(1L);
+        s1.setTitle("Section 1");
+        s1.setOrderIndex(1);
+        s1.setContent("Section 1");
+
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findById(1L)).thenReturn(Optional.of(phase));
+        when(sectionRepository.findByPhaseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of(s1));
+
+        List<SectionDto> result = courseService.getSectionsForPhase(1L, 1L);
+
+        assertEquals(1, result.size());
+        assertEquals("Section 1", result.get(0).getTitle());
+        assertEquals(1, result.get(0).getOrderIndex());
+        assertEquals("Section 1", result.get(0).getContent());
+        assertEquals(1L, result.get(0).getPhaseId());
+    }
+
+    @Test
+    void getSectionsForPhase_phaseExistsNoSections_returnsEmpty() {
+        Course course = new Course();
+        course.setId(1L);
+
+        Phase phase = new Phase();
+        phase.setId(1L);
+        phase.setCourse(course);
+
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findById(1L)).thenReturn(Optional.of(phase));
+        when(sectionRepository.findByPhaseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of());
+
+        assertTrue(courseService.getSectionsForPhase(1L, 1L).isEmpty());
     }
 }

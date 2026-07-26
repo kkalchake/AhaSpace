@@ -2,10 +2,10 @@ package com.kkalchake.enlightenment.dto;
 import lombok.*;
 
 @Data @AllArgsConstructor
-public class SectionDto {
+public class PhaseDto {
     private Long id;
     private String title;
+    private String description;
     private int orderIndex;
-    private String content;
-    private Long phaseId;
+    private Long courseId;
 }

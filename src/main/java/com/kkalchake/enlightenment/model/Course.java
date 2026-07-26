@@ -21,13 +21,12 @@ public class Course {
 
     private String title;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    // mappedBy = "enrolledCourses": User.enrolledCourses owns the FK columns via user_courses
     @ManyToMany(mappedBy = "enrolledCourses", fetch = FetchType.LAZY)
     private Set<User> enrolledUsers = new HashSet<>();
 
-    // mappedBy = "course": Section.course owns the FK; cascade+orphanRemoval deletes sections with the course
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Section> sections = new ArrayList<>();
+    private List<Phase> phases = new ArrayList<>();
 }

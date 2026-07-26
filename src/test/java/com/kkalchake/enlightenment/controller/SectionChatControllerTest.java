@@ -52,8 +52,7 @@ class SectionChatControllerTest {
 
     @Test
     void chat_requiresAuthentication() throws Exception {
-        // No token provided, expecting a block
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Hello\"}"))
@@ -65,7 +64,7 @@ class SectionChatControllerTest {
         SectionChatResponse response = new SectionChatResponse("AI response here", "gemini-2.0-flash", 1L, "Hello AI");
         when(sectionChatService.processMessage(anyLong(), anyString(), anyString(), any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .header("Authorization", getAuthHeader())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,7 +78,7 @@ class SectionChatControllerTest {
 
     @Test
     void chat_validationError_blankMessage() throws Exception {
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .header("Authorization", getAuthHeader())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,7 +91,7 @@ class SectionChatControllerTest {
         when(sectionChatService.processMessage(anyLong(), anyString(), anyString(), any()))
                 .thenThrow(new RuntimeException("AI service error"));
 
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .header("Authorization", getAuthHeader())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -106,7 +105,7 @@ class SectionChatControllerTest {
         when(sectionChatService.processMessage(anyLong(), anyString(), anyString(), any()))
                 .thenThrow(new IllegalStateException("Not configured"));
 
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .header("Authorization", getAuthHeader())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +120,7 @@ class SectionChatControllerTest {
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.FORBIDDEN, "Access denied"));
 
-        mockMvc.perform(post("/api/courses/1/sections/1/chat")
+        mockMvc.perform(post("/api/courses/1/phases/1/sections/1/chat")
                         .header("Authorization", getAuthHeader())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +133,7 @@ class SectionChatControllerTest {
         SectionChatSessionSummaryDto dto = new SectionChatSessionSummaryDto(1L, "Test session", java.time.LocalDateTime.now());
         when(sectionChatService.getSessions(1L, "testuser")).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/courses/1/sections/1/chat/sessions")
+        mockMvc.perform(get("/api/courses/1/phases/1/sections/1/chat/sessions")
                         .header("Authorization", getAuthHeader()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
@@ -143,7 +142,7 @@ class SectionChatControllerTest {
 
     @Test
     void getSessions_requiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/courses/1/sections/1/chat/sessions"))
+        mockMvc.perform(get("/api/courses/1/phases/1/sections/1/chat/sessions"))
                 .andExpect(status().isForbidden());
     }
 
@@ -152,7 +151,7 @@ class SectionChatControllerTest {
         SectionChatSessionDetailDto dto = new SectionChatSessionDetailDto(1L, "Test", java.time.LocalDateTime.now(), List.of());
         when(sectionChatService.getSession(eq(1L), eq(1L), eq("testuser"))).thenReturn(dto);
 
-        mockMvc.perform(get("/api/courses/1/sections/1/chat/sessions/1")
+        mockMvc.perform(get("/api/courses/1/phases/1/sections/1/chat/sessions/1")
                         .header("Authorization", getAuthHeader()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
@@ -164,7 +163,7 @@ class SectionChatControllerTest {
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.FORBIDDEN, "Access denied"));
 
-        mockMvc.perform(get("/api/courses/1/sections/1/chat/sessions/2")
+        mockMvc.perform(get("/api/courses/1/phases/1/sections/1/chat/sessions/2")
                         .header("Authorization", getAuthHeader()))
                 .andExpect(status().isForbidden());
     }

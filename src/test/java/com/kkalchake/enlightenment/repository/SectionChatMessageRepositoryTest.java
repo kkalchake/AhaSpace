@@ -1,6 +1,7 @@
 package com.kkalchake.enlightenment.repository;
 
 import com.kkalchake.enlightenment.model.Course;
+import com.kkalchake.enlightenment.model.Phase;
 import com.kkalchake.enlightenment.model.Section;
 import com.kkalchake.enlightenment.model.SectionChatMessage;
 import com.kkalchake.enlightenment.model.SectionChatSession;
@@ -30,6 +31,9 @@ class SectionChatMessageRepositoryTest {
     private CourseRepository courseRepository;
 
     @Autowired
+    private PhaseRepository phaseRepository;
+
+    @Autowired
     private SectionRepository sectionRepository;
 
     private SectionChatSession testSession;
@@ -45,9 +49,17 @@ class SectionChatMessageRepositoryTest {
         course.setTitle("Course A");
         course = courseRepository.save(course);
 
+        Phase phase = new Phase();
+        phase.setTitle("Phase A");
+        phase.setOrderIndex(0);
+        phase.setCourse(course);
+        phase = phaseRepository.save(phase);
+
         Section section = new Section();
+        section.setTitle("Test Section");
+        section.setOrderIndex(1);
         section.setContent("Section content");
-        section.setCourse(course);
+        section.setPhase(phase);
         section = sectionRepository.save(section);
 
         testSession = new SectionChatSession();

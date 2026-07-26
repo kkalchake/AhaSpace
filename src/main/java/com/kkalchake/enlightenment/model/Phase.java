@@ -3,12 +3,15 @@ package com.kkalchake.enlightenment.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
-@Table(name = "sections")
+@Table(name = "phases")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Section {
+public class Phase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,11 +23,13 @@ public class Section {
     @Column(name = "order_index", nullable = false)
     private int orderIndex;
 
-    // TEXT column: section content can exceed the default VARCHAR(255) length
     @Column(columnDefinition = "TEXT")
-    private String content;
+    private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "phase_id", nullable = false)
-    private Phase phase;
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
+    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Section> sections = new ArrayList<>();
 }

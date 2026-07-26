@@ -1,6 +1,7 @@
 package com.kkalchake.enlightenment.repository;
 
 import com.kkalchake.enlightenment.model.Course;
+import com.kkalchake.enlightenment.model.Phase;
 import com.kkalchake.enlightenment.model.Section;
 import com.kkalchake.enlightenment.model.SectionChatSession;
 import com.kkalchake.enlightenment.model.User;
@@ -26,6 +27,9 @@ class SectionChatSessionRepositoryTest {
     private CourseRepository courseRepository;
 
     @Autowired
+    private PhaseRepository phaseRepository;
+
+    @Autowired
     private SectionRepository sectionRepository;
 
     private User testUser;
@@ -42,9 +46,17 @@ class SectionChatSessionRepositoryTest {
         course.setTitle("Course A");
         course = courseRepository.save(course);
 
+        Phase phase = new Phase();
+        phase.setTitle("Phase A");
+        phase.setOrderIndex(0);
+        phase.setCourse(course);
+        phase = phaseRepository.save(phase);
+
         testSection = new Section();
+        testSection.setTitle("Test Section");
+        testSection.setOrderIndex(1);
         testSection.setContent("Section content");
-        testSection.setCourse(course);
+        testSection.setPhase(phase);
         testSection = sectionRepository.save(testSection);
     }
 
@@ -93,8 +105,10 @@ class SectionChatSessionRepositoryTest {
     void findByUserEmailAndSectionIdOrderByCreatedAtDesc_differentSection_returnsEmpty() {
         // Same user, but a session tied to a second section must not show up when querying the first
         Section otherSection = new Section();
+        otherSection.setTitle("Other Section");
+        otherSection.setOrderIndex(2);
         otherSection.setContent("Other section content");
-        otherSection.setCourse(testSection.getCourse());
+        otherSection.setPhase(testSection.getPhase());
         otherSection = sectionRepository.save(otherSection);
 
         SectionChatSession s = new SectionChatSession();

@@ -45,4 +45,18 @@ class CourseRepositoryTest {
 
         assertTrue(courseRepository.existsById(saved.getId()));
     }
+
+    @Test
+    void findByTitle_knownTitle_returnsCourse() {
+        Course course = new Course();
+        course.setTitle("AI Engineering From Scratch");
+        courseRepository.save(course);
+
+        assertTrue(courseRepository.findByTitle("AI Engineering From Scratch").isPresent());
+    }
+
+    @Test
+    void findByTitle_unknownTitle_returnsEmpty() {
+        assertTrue(courseRepository.findByTitle("Nonexistent").isEmpty());
+    }
 }

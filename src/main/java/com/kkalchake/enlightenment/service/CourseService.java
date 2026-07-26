@@ -18,24 +18,38 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final PhaseRepository phaseRepository;
     private final SectionRepository sectionRepository;
 
     @Transactional(readOnly = true)
     public List<CourseDto> getAllCourses() {
-        // Mapping to DTO happens inside the transaction: readOnly = true keeps the
-        // session open long enough for this stream, even though Course fields used here aren't LAZY.
         return courseRepository.findAll().stream()
                 .map(c -> new CourseDto(c.getId(), c.getTitle(), c.getDescription()))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<SectionDto> getSectionsForCourse(Long courseId) {
+    public List<PhaseDto> getPhasesForCourse(Long courseId) {
         if (!courseRepository.existsById(courseId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found");
         }
-        return sectionRepository.findByCourseId(courseId).stream()
-                .map(s -> new SectionDto(s.getId(), s.getContent(), courseId))
+        return phaseRepository.findByCourseIdOrderByOrderIndexAsc(courseId).stream()
+                .map(p -> new PhaseDto(p.getId(), p.getTitle(), p.getDescription(), p.getOrderIndex(), courseId))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<SectionDto> getSectionsForPhase(Long courseId, Long phaseId) {
+        if (!courseRepository.existsById(courseId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found");
+        }
+        var phase = phaseRepository.findById(phaseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Phase not found"));
+        if (!phase.getCourse().getId().equals(courseId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Phase not found");
+        }
+        return sectionRepository.findByPhaseIdOrderByOrderIndexAsc(phaseId).stream()
+                .map(s -> new SectionDto(s.getId(), s.getTitle(), s.getOrderIndex(), s.getContent(), phaseId))
                 .collect(Collectors.toList());
     }
 }

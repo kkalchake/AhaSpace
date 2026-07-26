@@ -22,10 +22,13 @@ public class CourseController {
         return ResponseEntity.ok(courseService.getAllCourses());
     }
 
-    // ResponseStatusException(NOT_FOUND) thrown by the service propagates through
-    // Spring MVC and is rendered as 404 by the existing GlobalExceptionHandler.
-    @GetMapping("/{courseId}/sections")
-    public ResponseEntity<List<SectionDto>> getSections(@PathVariable Long courseId) {
-        return ResponseEntity.ok(courseService.getSectionsForCourse(courseId));
+    @GetMapping("/{courseId}/phases")
+    public ResponseEntity<List<PhaseDto>> getPhases(@PathVariable Long courseId) {
+        return ResponseEntity.ok(courseService.getPhasesForCourse(courseId));
+    }
+
+    @GetMapping("/{courseId}/phases/{phaseId}/sections")
+    public ResponseEntity<List<SectionDto>> getSections(@PathVariable Long courseId, @PathVariable Long phaseId) {
+        return ResponseEntity.ok(courseService.getSectionsForPhase(courseId, phaseId));
     }
 }
