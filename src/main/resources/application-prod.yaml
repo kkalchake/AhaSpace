@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql:///ahaspace?cloudSqlInstance=${CLOUD_SQL_CONNECTION_NAME}&socketFactory=com.google.cloud.sql.postgres.SocketFactory
+    url: jdbc:postgresql://${DB_HOST}/ahaspace?sslmode=require
     username: ahaspace_app
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
