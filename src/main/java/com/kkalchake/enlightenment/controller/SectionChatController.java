@@ -15,17 +15,14 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/courses/{courseId}/sections/{sectionId}/chat")
+@RequestMapping("/api/courses/{courseId}/phases/{phaseId}/sections/{sectionId}/chat")
 @RequiredArgsConstructor
 public class SectionChatController {
 
     private final SectionChatService sectionChatService;
 
-    // courseId is kept in the path purely for URL consistency with the rest of the
-    // /api/courses/{courseId}/... surface; sections are looked up by their own id, so
-    // courseId is never used for lookup or filtering here.
     @PostMapping
-    public ResponseEntity<?> chat(@PathVariable Long courseId, @PathVariable Long sectionId,
+    public ResponseEntity<?> chat(@PathVariable Long courseId, @PathVariable Long phaseId, @PathVariable Long sectionId,
                                    @Valid @RequestBody SectionChatRequest request, Authentication authentication) {
         log.info("Received section chat message from user: {} for section: {}", authentication.getName(), sectionId);
         try {
@@ -33,8 +30,6 @@ public class SectionChatController {
                     sectionId, request.getMessage(), authentication.getName(), request.getSessionId());
             return ResponseEntity.ok(response);
         } catch (ResponseStatusException e) {
-            // Must be caught BEFORE RuntimeException — ResponseStatusException extends RuntimeException,
-            // so without this clause it would be swallowed as a generic 400
             return ResponseEntity.status(e.getStatusCode())
                     .body(Map.of("error", e.getReason() != null ? e.getReason() : "Request error"));
         } catch (IllegalStateException e) {
@@ -50,21 +45,23 @@ public class SectionChatController {
 
     @GetMapping("/sessions")
     public ResponseEntity<List<SectionChatSessionSummaryDto>> getSessions(
-            @PathVariable Long courseId, @PathVariable Long sectionId, Authentication authentication) {
+            @PathVariable Long courseId, @PathVariable Long phaseId, @PathVariable Long sectionId,
+            Authentication authentication) {
         return ResponseEntity.ok(sectionChatService.getSessions(sectionId, authentication.getName()));
     }
 
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<SectionChatSessionDetailDto> getSession(
-            @PathVariable Long courseId, @PathVariable Long sectionId, @PathVariable Long sessionId,
-            Authentication authentication) {
+            @PathVariable Long courseId, @PathVariable Long phaseId, @PathVariable Long sectionId,
+            @PathVariable Long sessionId, Authentication authentication) {
         // ResponseStatusException from the service propagates through Spring MVC with the correct HTTP status
         return ResponseEntity.ok(sectionChatService.getSession(sectionId, sessionId, authentication.getName()));
     }
 
     @DeleteMapping("/sessions/{sessionId}")
-    public ResponseEntity<Void> deleteSession(@PathVariable Long courseId, @PathVariable Long sectionId,
-                                               @PathVariable Long sessionId, Authentication authentication) {
+    public ResponseEntity<Void> deleteSession(@PathVariable Long courseId, @PathVariable Long phaseId,
+                                               @PathVariable Long sectionId, @PathVariable Long sessionId,
+                                               Authentication authentication) {
         sectionChatService.deleteSession(sectionId, sessionId, authentication.getName());
         return ResponseEntity.noContent().build();
     }

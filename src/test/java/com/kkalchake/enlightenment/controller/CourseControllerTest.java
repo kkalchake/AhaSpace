@@ -1,6 +1,7 @@
 package com.kkalchake.enlightenment.controller;
 
 import com.kkalchake.enlightenment.dto.CourseDto;
+import com.kkalchake.enlightenment.dto.PhaseDto;
 import com.kkalchake.enlightenment.dto.SectionDto;
 import com.kkalchake.enlightenment.service.CourseService;
 import com.kkalchake.enlightenment.util.JwtUtil;
@@ -73,32 +74,65 @@ class CourseControllerTest {
     }
 
     @Test
+    void getPhases_requiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/courses/1/phases"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getPhases_returnsListWhenAuthenticated() throws Exception {
+        PhaseDto dto = new PhaseDto(1L, "Phase 0: Setup & Tooling", "Phase description", 0, 1L);
+        when(courseService.getPhasesForCourse(1L)).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/courses/1/phases")
+                        .header("Authorization", getAuthHeader()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].title").value("Phase 0: Setup & Tooling"))
+                .andExpect(jsonPath("$[0].orderIndex").value(0))
+                .andExpect(jsonPath("$[0].courseId").value(1));
+    }
+
+    @Test
+    void getPhases_courseNotFound_returns404() throws Exception {
+        when(courseService.getPhasesForCourse(99L))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        mockMvc.perform(get("/api/courses/99/phases")
+                        .header("Authorization", getAuthHeader()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Course not found"));
+    }
+
+    @Test
     void getSections_requiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/courses/1/sections"))
+        mockMvc.perform(get("/api/courses/1/phases/1/sections"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void getSections_returnsListWhenAuthenticated() throws Exception {
-        SectionDto dto = new SectionDto(1L, "Section content", 1L);
-        when(courseService.getSectionsForCourse(1L)).thenReturn(List.of(dto));
+        SectionDto dto = new SectionDto(1L, "Section Title", 1, "Section content", 1L);
+        when(courseService.getSectionsForPhase(1L, 1L)).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/courses/1/sections")
+        mockMvc.perform(get("/api/courses/1/phases/1/sections")
                         .header("Authorization", getAuthHeader()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].title").value("Section Title"))
+                .andExpect(jsonPath("$[0].orderIndex").value(1))
                 .andExpect(jsonPath("$[0].content").value("Section content"))
-                .andExpect(jsonPath("$[0].courseId").value(1));
+                .andExpect(jsonPath("$[0].phaseId").value(1));
     }
 
     @Test
-    void getSections_courseNotFound_returns404() throws Exception {
-        when(courseService.getSectionsForCourse(99L))
-                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+    void getSections_phaseNotFound_returns404() throws Exception {
+        when(courseService.getSectionsForPhase(1L, 99L))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Phase not found"));
 
-        mockMvc.perform(get("/api/courses/99/sections")
+        mockMvc.perform(get("/api/courses/1/phases/99/sections")
                         .header("Authorization", getAuthHeader()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Course not found"));
+                .andExpect(jsonPath("$.error").value("Phase not found"));
     }
 }
