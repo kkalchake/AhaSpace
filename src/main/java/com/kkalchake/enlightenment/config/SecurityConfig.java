@@ -58,6 +58,15 @@ import java.util.List;
                             .requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers("/h2-console/**").permitAll()
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                            // Method-scoped to GET on purpose: even if a write
+                            // route is later added under /api/public/**, this
+                            // matcher alone can never expose it - it would
+                            // still fall through to .anyRequest().authenticated()
+                            // below. JwtFilter needs no change to support this:
+                            // it never rejects a request, it only optionally
+                            // populates the SecurityContext when a Bearer
+                            // header is present and parses.
+                            .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                             .anyRequest().authenticated()
                     )
                     .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));

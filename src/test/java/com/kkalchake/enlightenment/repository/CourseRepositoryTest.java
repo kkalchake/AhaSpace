@@ -59,4 +59,42 @@ class CourseRepositoryTest {
     void findByTitle_unknownTitle_returnsEmpty() {
         assertTrue(courseRepository.findByTitle("Nonexistent").isEmpty());
     }
+
+    @Test
+    void findByIsPublicTrue_returnsOnlyPublicCourses() {
+        Course pub = new Course();
+        pub.setTitle("Public");
+        pub.setPublic(true);
+        courseRepository.save(pub);
+
+        Course priv = new Course();
+        priv.setTitle("Private");
+        priv.setPublic(false);
+        courseRepository.save(priv);
+
+        List<Course> result = courseRepository.findByIsPublicTrue();
+
+        assertEquals(1, result.size());
+        assertEquals("Public", result.get(0).getTitle());
+    }
+
+    @Test
+    void findByIdAndIsPublicTrue_publicCourse_returnsCourse() {
+        Course pub = new Course();
+        pub.setTitle("Public");
+        pub.setPublic(true);
+        Course saved = courseRepository.save(pub);
+
+        assertTrue(courseRepository.findByIdAndIsPublicTrue(saved.getId()).isPresent());
+    }
+
+    @Test
+    void findByIdAndIsPublicTrue_privateCourse_returnsEmpty() {
+        Course priv = new Course();
+        priv.setTitle("Private");
+        priv.setPublic(false);
+        Course saved = courseRepository.save(priv);
+
+        assertTrue(courseRepository.findByIdAndIsPublicTrue(saved.getId()).isEmpty());
+    }
 }

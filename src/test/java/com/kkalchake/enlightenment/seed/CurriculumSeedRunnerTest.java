@@ -79,4 +79,22 @@ class CurriculumSeedRunnerTest {
                         + "https://github.com/rohitg00/ai-engineering-from-scratch / https://aiengineeringfromscratch.com. "
                         + "Licensed under the MIT License (Copyright (c) 2026 Rohit Ghumare)."));
     }
+
+    @Test
+    void pilotCourseConstants_isPublicWithSourceFieldsPopulated() {
+        assertTrue(CurriculumSeedRunner.COURSE_IS_PUBLIC);
+        assertEquals("AI Engineering from Scratch by rohitg00", CurriculumSeedRunner.COURSE_SOURCE_NAME);
+        assertEquals("https://github.com/rohitg00/ai-engineering-from-scratch", CurriculumSeedRunner.COURSE_SOURCE_URL);
+        assertTrue(CurriculumSeedRunner.COURSE_SOURCE_LICENSE.contains("MIT License"));
+        assertFalse(CurriculumSeedRunner.COURSE_DESCRIPTION.isBlank());
+    }
+
+    @Test
+    void pilotCourseConstants_insightsIsNewlineSeparatedWithMultipleItems() {
+        String[] lines = CurriculumSeedRunner.COURSE_INSIGHTS.split("\\R");
+        assertTrue(lines.length > 1);
+        for (String line : lines) {
+            assertFalse(line.isBlank());
+        }
+    }
 }

@@ -66,6 +66,133 @@ class CourseServiceTest {
     }
 
     @Test
+    void getAllCourses_insightsNull_mapsToEmptyList() {
+        Course c = new Course();
+        c.setId(1L);
+        c.setTitle("Intro");
+        when(courseRepository.findAll()).thenReturn(List.of(c));
+
+        assertTrue(courseService.getAllCourses().get(0).getInsights().isEmpty());
+    }
+
+    @Test
+    void getAllCourses_insightsMultiLine_splitsTrimsAndDropsBlankLines() {
+        Course c = new Course();
+        c.setId(1L);
+        c.setTitle("Intro");
+        c.setInsights("Insight one\n\n  Insight two  \n");
+        when(courseRepository.findAll()).thenReturn(List.of(c));
+
+        assertEquals(List.of("Insight one", "Insight two"),
+                courseService.getAllCourses().get(0).getInsights());
+    }
+
+    @Test
+    void getPublicCourses_returnsOnlyPublicMappedDtos() {
+        Course pub = new Course();
+        pub.setId(1L);
+        pub.setTitle("Public Course");
+        pub.setPublic(true);
+        when(courseRepository.findByIsPublicTrue()).thenReturn(List.of(pub));
+
+        List<CourseDto> result = courseService.getPublicCourses();
+
+        assertEquals(1, result.size());
+        assertTrue(result.get(0).isPublic());
+    }
+
+    @Test
+    void getPublicCourse_publicCourse_returnsMappedDto() {
+        Course pub = new Course();
+        pub.setId(1L);
+        pub.setTitle("Public Course");
+        pub.setPublic(true);
+        when(courseRepository.findByIdAndIsPublicTrue(1L)).thenReturn(Optional.of(pub));
+
+        CourseDto dto = courseService.getPublicCourse(1L);
+
+        assertEquals("Public Course", dto.getTitle());
+    }
+
+    @Test
+    void getPublicCourse_privateCourse_throwsNotFoundNotForbidden() {
+        // A private (or nonexistent) course id must be indistinguishable: the
+        // repository call returns empty either way, so the service can't tell
+        // - and shouldn't try to - the two cases apart.
+        when(courseRepository.findByIdAndIsPublicTrue(1L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getPublicCourse(1L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getPublicPhasesForCourse_privateCourse_throwsNotFound() {
+        when(courseRepository.findByIdAndIsPublicTrue(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getPublicPhasesForCourse(99L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getPublicPhasesForCourse_publicCourse_delegatesToAuthenticatedLogic() {
+        Course pub = new Course();
+        pub.setId(1L);
+        pub.setPublic(true);
+
+        Phase p1 = new Phase();
+        p1.setId(1L);
+        p1.setTitle("Phase 0");
+        p1.setOrderIndex(0);
+
+        when(courseRepository.findByIdAndIsPublicTrue(1L)).thenReturn(Optional.of(pub));
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findByCourseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of(p1));
+
+        List<PhaseDto> result = courseService.getPublicPhasesForCourse(1L);
+
+        assertEquals(1, result.size());
+        assertEquals("Phase 0", result.get(0).getTitle());
+    }
+
+    @Test
+    void getPublicSectionsForPhase_privateCourse_throwsNotFound() {
+        when(courseRepository.findByIdAndIsPublicTrue(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> courseService.getPublicSectionsForPhase(99L, 1L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getPublicSectionsForPhase_publicCourse_delegatesToAuthenticatedLogic() {
+        Course pub = new Course();
+        pub.setId(1L);
+        pub.setPublic(true);
+
+        Phase phase = new Phase();
+        phase.setId(1L);
+        phase.setCourse(pub);
+
+        Section s1 = new Section();
+        s1.setId(1L);
+        s1.setTitle("Section 1");
+        s1.setOrderIndex(1);
+        s1.setContent("Section 1");
+
+        when(courseRepository.findByIdAndIsPublicTrue(1L)).thenReturn(Optional.of(pub));
+        when(courseRepository.existsById(1L)).thenReturn(true);
+        when(phaseRepository.findById(1L)).thenReturn(Optional.of(phase));
+        when(sectionRepository.findByPhaseIdOrderByOrderIndexAsc(1L)).thenReturn(List.of(s1));
+
+        List<SectionDto> result = courseService.getPublicSectionsForPhase(1L, 1L);
+
+        assertEquals(1, result.size());
+        assertEquals("Section 1", result.get(0).getTitle());
+    }
+
+    @Test
     void getPhasesForCourse_courseNotFound_throwsNotFound() {
         when(courseRepository.existsById(99L)).thenReturn(false);
 
