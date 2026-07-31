@@ -51,7 +51,9 @@ class CourseControllerTest {
 
     @Test
     void getCourses_returnsListWhenAuthenticated() throws Exception {
-        CourseDto dto = new CourseDto(1L, "Intro", "Intro course");
+        CourseDto dto = new CourseDto(1L, "Intro", "Intro course", true,
+                "Source Name", "https://source.example/repo", "MIT License",
+                List.of("Insight one", "Insight two"));
         when(courseService.getAllCourses()).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/api/courses")
@@ -59,7 +61,17 @@ class CourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].title").value("Intro"))
-                .andExpect(jsonPath("$[0].description").value("Intro course"));
+                .andExpect(jsonPath("$[0].description").value("Intro course"))
+                // Wire key must be exactly "isPublic" - Lombok's isPublic()
+                // getter would otherwise serialize as "public" without the
+                // @JsonProperty annotation on CourseDto.
+                .andExpect(jsonPath("$[0].isPublic").value(true))
+                .andExpect(jsonPath("$[0].public").doesNotExist())
+                .andExpect(jsonPath("$[0].sourceName").value("Source Name"))
+                .andExpect(jsonPath("$[0].sourceUrl").value("https://source.example/repo"))
+                .andExpect(jsonPath("$[0].sourceLicense").value("MIT License"))
+                .andExpect(jsonPath("$[0].insights[0]").value("Insight one"))
+                .andExpect(jsonPath("$[0].insights[1]").value("Insight two"));
     }
 
     @Test

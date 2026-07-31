@@ -46,6 +46,32 @@ public class CurriculumSeedRunner implements CommandLineRunner {
                     + "https://github.com/rohitg00/ai-engineering-from-scratch / https://aiengineeringfromscratch.com. "
                     + "Licensed under the MIT License (Copyright (c) 2026 Rohit Ghumare).";
 
+    // Week 18: the pilot Course itself is now public and carries structured
+    // source attribution instead of the raw ATTRIBUTION blob as its
+    // description. ATTRIBUTION/buildDescription above are untouched - they
+    // still feed Phase.description, which keeps its blurb-then-attribution
+    // shape. Only the Course-level attribution moves into these fields.
+    static final boolean COURSE_IS_PUBLIC = true;
+
+    static final String COURSE_DESCRIPTION =
+            "A hands-on, code-first curriculum covering math foundations, ML "
+                    + "fundamentals, and applied AI engineering - from dev environment "
+                    + "setup through building and evaluating real systems.";
+
+    static final String COURSE_SOURCE_NAME = "AI Engineering from Scratch by rohitg00";
+
+    static final String COURSE_SOURCE_URL = "https://github.com/rohitg00/ai-engineering-from-scratch";
+
+    static final String COURSE_SOURCE_LICENSE = "MIT License — Copyright (c) 2026 Rohit Ghumare";
+
+    // Newline-separated, matching how Course.insights is stored and how
+    // CourseService.toDto splits it back into a List<String> for the wire.
+    static final String COURSE_INSIGHTS = String.join("\n",
+            "Hands-on, code-first lessons over pure theory",
+            "Math foundations built before jumping into ML",
+            "Structured as phases, each phase a self-contained module"
+    );
+
     private static final Pattern LEADING_NUMBER = Pattern.compile("^(\\d+)-");
     private static final Pattern H1_LINE = Pattern.compile("^#\\s+(.*)$");
     private static final Pattern BLURB_LINE = Pattern.compile("^>\\s*(.*)$");
@@ -76,7 +102,12 @@ public class CurriculumSeedRunner implements CommandLineRunner {
                 .orElseGet(() -> {
                     Course c = new Course();
                     c.setTitle(CURRICULUM_TITLE);
-                    c.setDescription(ATTRIBUTION);
+                    c.setDescription(COURSE_DESCRIPTION);
+                    c.setPublic(COURSE_IS_PUBLIC);
+                    c.setSourceName(COURSE_SOURCE_NAME);
+                    c.setSourceUrl(COURSE_SOURCE_URL);
+                    c.setSourceLicense(COURSE_SOURCE_LICENSE);
+                    c.setInsights(COURSE_INSIGHTS);
                     return courseRepository.save(c);
                 });
 

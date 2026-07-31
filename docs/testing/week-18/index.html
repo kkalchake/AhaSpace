@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Week 18 — Public Demo Mode</title>
+<style>
+  :root {
+    --paper: #EEF0F2; --card: #FFFFFF; --ink: #1B2430; --ink-dim: #4B5563; --border: #D7DBDE;
+    --owning: #A6601F; --owning-bg: #F3E6D6; --inverse: #2F6A8C; --inverse-bg: #E1EDF3;
+    --danger: #B0362C; --danger-bg: #F7E4E1; --good: #3C7A5C; --good-bg: #E3F0E9;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+    --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+    --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1B2128; --ink: #E4E7EA; --ink-dim: #9AA4AE; --border: #2B333B;
+      --owning: #D98A4C; --owning-bg: #3A2A18; --inverse: #74AACD; --inverse-bg: #16303D;
+      --danger: #E08277; --danger-bg: #3A1E1B; --good: #7FBE9C; --good-bg: #17301F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0/22px 22px, var(--paper);
+    color: var(--ink); font-family: var(--font-serif); line-height: 1.55; padding: 48px 20px 96px;
+  }
+  .page { max-width: 900px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 14px; }
+  h1 { font-family: var(--font-mono); font-size: clamp(22px, 4vw, 30px); font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { font-size: 16px; color: var(--ink-dim); max-width: 66ch; margin: 0; }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14.5px; }
+  table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  table.summary th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  table.summary td.num { font-family: var(--font-mono); color: var(--ink-dim); width: 28px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 2px; font-weight: 700; }
+  .pill.pass { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--owning-bg); color: var(--owning); }
+  .pill.skip { background: var(--border); color: var(--ink-dim); }
+
+  section.step { margin-top: 52px; padding-top: 36px; border-top: 1px solid var(--border); }
+  .step-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .step-num { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); flex: none; }
+  h2 { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin: 0; }
+  .step-note { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 4px 0 16px; }
+  .step-note strong { color: var(--ink); }
+  .shot { max-width: 100%; border: 1px solid var(--border); display: block; }
+  .shot-wrap { overflow-x: auto; }
+  .shot-caption { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin: 6px 0 0; }
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+    overflow-x: auto; margin: 0;
+  }
+  .term-head {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .term pre {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .term .status { color: var(--danger); font-weight: 700; }
+  .term .status.ok { color: var(--good); }
+  .term .status.warn { color: var(--owning); }
+  .term .dim { color: var(--ink-dim); }
+  .group-label {
+    font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--inverse); margin: 64px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--inverse);
+  }
+  .group-intro { font-size: 14.5px; color: var(--ink-dim); max-width: 68ch; margin: 14px 0 0; }
+
+  details.group { margin-top: 64px; }
+  details.group summary.group-label {
+    margin: 0; cursor: pointer; list-style: none; user-select: none; display: block;
+  }
+  details.group summary.group-label::-webkit-details-marker { display: none; }
+  details.group summary.group-label::before { content: '▸  '; }
+  details.group[open] summary.group-label::before { content: '▾  '; }
+  details.group summary.group-label:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+
+  details.recreate {
+    margin-top: 16px; border: 1px solid var(--border); background: var(--card);
+  }
+  details.recreate summary {
+    cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--inverse); list-style: none; user-select: none;
+  }
+  details.recreate summary::-webkit-details-marker { display: none; }
+  details.recreate summary::before { content: '▸  '; }
+  details.recreate[open] summary::before { content: '▾  '; }
+  details.recreate summary:focus-visible { outline: 2px solid var(--inverse); outline-offset: 2px; }
+  details.recreate .body { padding: 2px 16px 16px; font-size: 14px; border-top: 1px solid var(--border); }
+  details.recreate .body ol, details.recreate .body ul { padding-left: 20px; margin: 8px 0; }
+  details.recreate .body li { margin: 7px 0; }
+  details.recreate pre {
+    background: var(--paper); border: 1px solid var(--border); padding: 10px 12px;
+    overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; margin: 8px 0;
+  }
+  details.recreate code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+  details.recreate.setup summary, details.recreate.teardown summary { color: var(--owning); font-weight: 700; }
+
+  .dialog-note {
+    margin-top: 14px; border: 1px dashed var(--inverse); background: var(--inverse-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .dialog-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--inverse); display: block; margin-bottom: 6px; }
+  .dialog-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .flag-note {
+    margin-top: 14px; border: 1px dashed var(--danger); background: var(--danger-bg);
+    padding: 12px 14px; font-size: 14px; color: var(--ink);
+  }
+  .flag-note .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--danger); display: block; margin-bottom: 6px; }
+  .flag-note code { font-family: var(--font-mono); background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 1px 5px; border-radius: 2px; }
+
+  .pre-wrap { position: relative; }
+  .pre-wrap pre { padding-right: 60px; }
+  .copy-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 3px 8px; cursor: pointer; opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .pre-wrap:hover .copy-btn, .pre-wrap:focus-within .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--inverse); border-color: var(--inverse); }
+  .copy-btn:focus-visible { opacity: 1; outline: 2px solid var(--inverse); outline-offset: 1px; }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Week 18 — Public demo mode</p>
+  <h1>Browsing AhaSpace without an account: the public course demo</h1>
+  <p class="sub">Before this week, every course route required a JWT — a visitor with no account had nothing to look at except a login form. This week adds a second, unauthenticated path through the same course data: one course (<strong>AI Engineering From Scratch</strong>) is flagged <code>isPublic = true</code> on the <code>Course</code> row, a brand-new set of <code>/api/public/courses...</code> endpoints serves only public courses with no JWT required, and the frontend's course pages fetch from those endpoints when nobody is logged in. The section-embedded AI chat panel still renders for a logged-out visitor — it just intercepts the send action client-side and asks them to sign in, without ever touching the network. Nothing about the existing authenticated <code>/api/courses/**</code> path changes except that its response body gained a few new fields. Every screenshot below is a real request against a real running backend and a real Postgres database — none of this is mocked.</p>
+
+  <table class="summary">
+    <tr><th></th><th>Step</th><th>Expected</th><th>Result</th></tr>
+    <tr><td class="num">01</td><td>Setup — Postgres, backend on <code>dev,seed</code> profiles, frontend</td><td>All three reachable, seed run creates one public course with source/insights data</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">02</td><td>Data layer — <code>courses</code> table gains 5 new columns</td><td>Schema shows <code>is_public</code>, <code>source_name</code>, <code>source_url</code>, <code>source_license</code>, <code>insights</code>; insert/update/select round-trip works</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">03–06</td><td>4 new <code>/api/public/courses...</code> routes</td><td>200 with real data for a public course; 404 (never 401/403) for a private or nonexistent id; non-GET rejected</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">07</td><td>Existing <code>GET /api/courses</code>, authenticated</td><td>Same route, response now includes <code>isPublic</code>/<code>sourceName</code>/<code>sourceUrl</code>/<code>sourceLicense</code>/<code>insights</code>; unauthenticated call still 403</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">08–13</td><td>Full unauthenticated demo flow in a real browser</td><td>Landing page → public course list → course detail with source/insights → phase → section → chat panel renders but sending fires <strong>zero</strong> network requests, opens sign-in modal instead</td><td><span class="pill pass">PASS</span></td></tr>
+    <tr><td class="num">14–17</td><td>Authenticated contrast</td><td>Nav bar keeps AI Chat, drops Sign In/Register; course list shows every course; chat panel shows session history and a message actually sends and gets a real Gemini reply</td><td><span class="pill pass">PASS</span></td></tr>
+  </table>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<details class="group" open>
+<summary class="group-label">Setup</summary>
+<p class="group-intro">Three things need to be running, in this order: Postgres (with the <code>enlightenment</code> database and <code>ahaspace</code> user this project's <code>docker-compose.yml</code> creates), the backend on <strong>two</strong> Spring profiles at once (<code>dev</code> for the Postgres datasource, <code>seed</code> for the one-time curriculum seed that now marks a course public), and the frontend dev server.</p>
+
+<details class="recreate setup">
+  <summary>Start Postgres</summary>
+  <div class="body">
+    <p>The project's own <code>docker-compose.yml</code> (repo root) is the supported path — it creates the <code>enlightenment</code> database and the <code>ahaspace</code> user/password <code>application-dev.yaml</code> already expects, with no manual SQL needed:</p>
+    <pre>cd AhaSpace
+docker compose up -d
+docker exec ahaspace-postgres pg_isready -U ahaspace -d enlightenment</pre>
+    <p>Docker Desktop's daemon was not running in the environment this guide was built in, so a native Homebrew Postgres install was used instead, with the role and database created by hand to match the compose file exactly:</p>
+    <pre>brew services start postgresql@14
+psql -h localhost -p 5432 -d postgres -c "CREATE ROLE ahaspace WITH LOGIN PASSWORD 'ahaspace';"
+psql -h localhost -p 5432 -d postgres -c "CREATE DATABASE enlightenment OWNER ahaspace;"</pre>
+    <p>Either path ends at the same place: a Postgres server on <code>localhost:5432</code> with a database named <code>enlightenment</code> owned by a user named <code>ahaspace</code> / password <code>ahaspace</code>. Use whichever is actually available.</p>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the backend on <code>dev,seed</code> — this is the one new wrinkle this week</summary>
+  <div class="body">
+    <p><code>CurriculumSeedRunner</code> is <code>@Profile("seed")</code> and reads <code>@Value("${curriculum.source-path}")</code> — that property has <strong>no default anywhere</strong> in <code>application.yaml</code> or <code>application-dev.yaml</code>, so it must be passed on the command line every time the seed profile is active. It points at a checkout of the actual upstream curriculum repo:</p>
+    <pre># if not already present at the repo root:
+git clone https://github.com/rohitg00/ai-engineering-from-scratch.git
+
+./mvnw spring-boot:run \
+  -Dspring-boot.run.profiles=dev,seed \
+  -Dspring-boot.run.arguments=--curriculum.source-path=/absolute/path/to/AhaSpace/ai-engineering-from-scratch</pre>
+    <p>Wait for <code>SERVER IS LIVE on http://localhost:8080!</code>. Before that line, watch for this — it only prints once, on the run that actually creates the course row:</p>
+    <div class="term"><div class="term-head">terminal — real seed output from this guide's run</div><pre>2026-07-28 16:47:07.342 INFO  ... The following 2 profiles are active: "dev", "seed"
+...
+Hibernate: insert into courses (description,insights,is_public,source_license,source_name,source_url,title) values (?,?,?,?,?,?,?)
+...
+<span class="status ok">2026-07-28 16:47:08.828 INFO  c.k.e.seed.CurriculumPhaseSeeder - Seeded phase 'Phase 0: Setup &amp; Tooling': 12 section(s).</span>
+<span class="status ok">2026-07-28 16:47:08.844 INFO  c.k.e.seed.CurriculumPhaseSeeder - Seeded phase 'Phase 1: Math Foundations': 22 section(s).</span>
+<span class="status ok">2026-07-28 16:47:08.856 INFO  c.k.e.seed.CurriculumPhaseSeeder - Seeded phase 'Phase 2: ML Fundamentals': 18 section(s).</span>
+<span class="status ok">2026-07-28 16:47:08.857 INFO  c.k.e.seed.CurriculumSeedRunner - Curriculum seed complete: 3 phase(s), 52 section(s) total.</span></pre></div>
+    <p>The seed is idempotent by design (<code>findByTitle(...).orElseGet(...)</code> in <code>CurriculumSeedRunner</code>, <code>existsByTitle</code> per phase in <code>CurriculumPhaseSeeder</code>) — running it again against an already-seeded database is a silent no-op, it does not duplicate rows or error.</p>
+    <p><strong>If you'd rather not run the seed profile at all</strong> (e.g. against a database that's already been seeded by a previous run, or one you're managing by hand), the alternative is running <code>scripts/week-18/002-course-public-and-source-fields.sql</code> directly — its final <code>UPDATE</code> backfills the same <code>is_public</code>/source/insights values onto whatever course row is already titled <code>AI Engineering From Scratch</code>:</p>
+    <pre>psql -h localhost -U ahaspace -d enlightenment -f scripts/week-18/002-course-public-and-source-fields.sql</pre>
+    <p>That script only backfills an <em>existing</em> course row, though — it does not create the course, phases, or sections from scratch. If the database is empty, the <code>seed</code> profile above is the only path that produces anything to browse at all.</p>
+  </div>
+</details>
+
+<details class="recreate setup">
+  <summary>Start the frontend</summary>
+  <div class="body">
+    <pre>cd AhaSpaceUI
+npm install
+npm run dev</pre>
+    <p><code>vite.config.js</code> pins the dev server to port 3000 with <code>strictPort: true</code> — the backend's CORS is still hardcoded to expect exactly <code>http://localhost:3000</code>, unchanged this week.</p>
+  </div>
+</details>
+
+</details>
+
+<!-- ============================== DATA LAYER ============================== -->
+<details class="group" open>
+<summary class="group-label">Data layer — <code>courses</code> gains 5 columns</summary>
+<p class="group-intro"><code>scripts/week-18/002-course-public-and-source-fields.sql</code> adds <code>is_public boolean not null default false</code>, plus four nullable columns: <code>source_name</code>, <code>source_url</code>, <code>source_license</code>, <code>insights</code> (<code>TEXT</code>, newline-separated — split into an array server-side by <code>CourseService.toDto</code>, never parsed by the frontend). Verified below with the H2 web console pointed at the real running Postgres database — the same tool, same technique Week 9's guide used, just against Postgres this time instead of the in-memory H2 database.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">02</span><h2>Schema — the 5 new columns, real types and nullability</h2></div>
+  <p class="step-note">Spring Boot's H2 console (enabled in <code>application.yaml</code>, <code>h2.console.enabled: true</code>) is a generic JDBC SQL client — it isn't limited to H2 databases, it can point at any JDBC URL, including the <code>dev</code> profile's live Postgres connection. Queried <code>information_schema.columns</code> directly rather than eyeballing the tree view, so the exact type and nullability of every new column is unambiguous.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/01-schema-courses-columns.png" alt="H2 console connected to Postgres, information_schema query showing courses table columns: id bigint NOT NULL, description text, insights text, is_public boolean NOT NULL, source_license/source_name/source_url varchar, title varchar"></div>
+  <p class="step-note" style="margin-top:14px;"><code>is_public boolean, NO</code> (not-nullable) confirms the migration's three-step add-nullable / backfill / constrain-after sequence completed — Postgres refuses <code>ADD COLUMN ... NOT NULL</code> outright on a populated table, which is exactly why the script does it in three steps instead of one.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>With the backend running (Setup above), open <code>http://localhost:8080/h2-console</code>.</li>
+        <li>The login form is pre-filled from <code>application-dev.yaml</code>'s datasource: <code>Driver Class</code> <code>org.postgresql.Driver</code>, <code>JDBC URL</code> <code>jdbc:postgresql://localhost:5432/enlightenment</code>, <code>User Name</code> <code>ahaspace</code>. Fill in <code>Password</code>: <code>ahaspace</code>, click <strong>Connect</strong>.</li>
+        <li>Run: <pre>SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'courses'
+ORDER BY ordinal_position;</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2>Insert, then update a course public with source + insights data</h2></div>
+  <p class="step-note">This is exactly what <code>scripts/week-18/002-course-public-and-source-fields.sql</code>'s final backfill <code>UPDATE</code> does to the real pilot course (and what <code>CurriculumSeedRunner</code> does at insert time on a fresh seed run, shown in the Setup section above) — reproduced here against a second, throwaway course row so the round trip is visible independent of the seed.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/02-insert-course.png" alt="H2 console INSERT INTO courses statement, Update count: 1"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/03-update-course-public.png" alt="H2 console UPDATE courses SET is_public = true, source_name, source_url, source_license, insights statement, Update count: 1"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li><pre>INSERT INTO courses (title, description, is_public)
+VALUES ('ML From Scratch (Demo Insert)', 'Placeholder while source content is prepared.', false);</pre></li>
+        <li><pre>UPDATE courses
+SET is_public = true,
+    source_name = 'ML From Scratch by rohitg00',
+    source_url = 'https://github.com/rohitg00/ml-from-scratch',
+    source_license = 'MIT License',
+    insights = 'Second demo course, added live while building this guide' || chr(10) ||
+               'Shows the same is_public + source/insights columns on a second row'
+WHERE title = 'ML From Scratch (Demo Insert)';</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2>Select — the resulting rows, side by side</h2></div>
+  <p class="step-note">Three rows after the steps above: the seeded pilot course (public, full source/insights), the private draft course used later for the 404/authenticated-contrast demonstrations, and the just-inserted demo row (public, its own source/insights). <code>null</code> in italics on the private row's source columns is exactly what an unattributed course looks like — those columns stay unset unless a course actually has an external source.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/04-select-courses-result.png" alt="H2 console SELECT id, title, is_public, source_name, source_url, source_license, insights FROM courses ORDER BY id — 3 rows: AI Engineering From Scratch (public, full source data), Private Draft Course (not public, nulls), ML From Scratch Demo Insert (public, full source data)"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>SELECT id, title, is_public, source_name, source_url, source_license, insights
+FROM courses
+ORDER BY id;</pre></div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== ENDPOINTS ============================== -->
+<details class="group" open>
+<summary class="group-label">New and changed endpoints</summary>
+<p class="group-intro">All four new routes live under <code>/api/public/courses</code>, mapped in a separate <code>PublicCourseController</code> so the "no auth required" surface stays visible in one file. Every card below is a real <code>curl</code> call against the running backend — real request, real response body, rendered into a card for readability (styled like a REST client, not one). A private-or-nonexistent course id resolves to the same 404 either way, by design: <code>getPublicCourse</code>/etc. all guard on <code>findByIdAndIsPublicTrue</code>, so a visitor probing course ids can never learn whether an id exists but is private, versus not existing at all.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">03</span><h2><code>GET /api/public/courses</code> — list, filtered to public only</h2></div>
+  <p class="step-note">Returns only the one course flagged <code>isPublic = true</code> — the private draft course inserted in the Data Layer section above does not appear, with no error and no indication it exists. No <code>Authorization</code> header sent or required.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/24-public-courses-list.png" alt="GET /api/public/courses, 200, array with one course: AI Engineering From Scratch, isPublic true, full source/insights fields"></div>
+  <p class="step-note" style="margin-top:14px;">Only <code>GET</code> is permitted under <code>/api/public/**</code> — <code>SecurityConfig</code>'s matcher is method-scoped on purpose, so this prefix can never accidentally grow a write path:</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/25-public-courses-list-write-rejected.png" alt="POST /api/public/courses, 403, empty body"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s http://localhost:8080/api/public/courses
+curl -s -w "\nHTTP %{http_code}\n" -X POST http://localhost:8080/api/public/courses</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">04</span><h2><code>GET /api/public/courses/{id}</code> — single course, 404 for private</h2></div>
+  <p class="step-note">Course 1 (public) returns its full detail. Course 2 — the private draft course inserted earlier — returns exactly the same 404 body a nonexistent id would, never 401 or 403: the route is <code>permitAll</code>, so an unauthenticated caller cannot be rejected on auth grounds, only told the resource isn't there.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/26-public-course-detail.png" alt="GET /api/public/courses/1, 200, full course detail"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/27-public-course-detail-private-404.png" alt="GET /api/public/courses/2, 404, error: Course not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s http://localhost:8080/api/public/courses/1
+curl -s -w "\nHTTP %{http_code}\n" http://localhost:8080/api/public/courses/2</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">05</span><h2><code>GET /api/public/courses/{id}/phases</code> — pre-sorted, 404 for nonexistent</h2></div>
+  <p class="step-note">All 3 pilot phases, sorted by <code>orderIndex</code> ascending (backend contract, no client-side sort). A nonexistent course id (<code>999</code>) 404s the same way the private course did above.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/28-public-course-phases.png" alt="GET /api/public/courses/1/phases, 200, array of 3 phases: Setup & Tooling, Math Foundations, ML Fundamentals"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/29-public-course-phases-nonexistent-404.png" alt="GET /api/public/courses/999/phases, 404, error: Course not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s http://localhost:8080/api/public/courses/1/phases
+curl -s -w "\nHTTP %{http_code}\n" http://localhost:8080/api/public/courses/999/phases</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">06</span><h2><code>GET /api/public/courses/{id}/phases/{phaseId}/sections</code> — 404 for a nonexistent phase</h2></div>
+  <p class="step-note">Phase 1 ("Dev Environment" onward) returns all 12 sections for a public course. A phase id that doesn't exist under that course 404s with the same "not found" shape as the course-level checks above — there's no way, from the response alone, to tell a bad phase id apart from a bad course id.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/30-public-sections.png" alt="GET /api/public/courses/1/phases/1/sections, 200, array of 12 sections, first one Dev Environment"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/31-public-sections-phase-404.png" alt="GET /api/public/courses/1/phases/999/sections, 404, error: Phase not found"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body"><pre>curl -s http://localhost:8080/api/public/courses/1/phases/1/sections
+curl -s -w "\nHTTP %{http_code}\n" http://localhost:8080/api/public/courses/1/phases/999/sections</pre></div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">07</span><h2>Existing <code>GET /api/courses</code> — same path, wider DTO</h2></div>
+  <p class="step-note">No new route on <code>CourseController</code> — it responds at exactly the same path as every prior week. What changed is the shape of every course in the array: <code>isPublic</code>, <code>sourceName</code>, <code>sourceUrl</code>, <code>sourceLicense</code>, <code>insights</code> are now present on every entry (with source fields <code>null</code>/<code>insights</code> <code>[]</code> for a course with no attribution, as the private draft course shows). Note the wire key is exactly <code>isPublic</code>, not <code>public</code> — <code>CourseDto</code> pins it with <code>@JsonProperty("isPublic")</code> specifically because Lombok's default getter naming for a primitive <code>boolean isPublic</code> would otherwise serialize it as <code>"public"</code>.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/32-authenticated-courses-with-new-fields.png" alt="GET /api/courses with Authorization Bearer header, 200, array of 2 courses including the new isPublic/sourceName/sourceUrl/sourceLicense/insights fields"></div>
+  <p class="step-note" style="margin-top:14px;">And the existing 403-when-unauthenticated behavior is completely unchanged — this route was never <code>permitAll</code> and still isn't:</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/33-courses-unauthenticated-403.png" alt="GET /api/courses with no Authorization header, 403, empty body"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>Register/log in to get a token: <pre>curl -s -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo_tester@example.com","password":"DemoPass123!"}'</pre></li>
+        <li><pre>curl -s http://localhost:8080/api/courses -H "Authorization: Bearer &lt;token from above&gt;"
+curl -s -w "\nHTTP %{http_code}\n" http://localhost:8080/api/courses</pre></li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== UNAUTHENTICATED FLOW ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — the unauthenticated demo flow, in a real browser</summary>
+<p class="group-intro">Everything below is one continuous click-through as a logged-out visitor, captured with Playwright against the real <code>npm run dev</code> frontend and the real backend from the sections above — no mocked responses anywhere in this section.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">08</span><h2>Landing page — the redesigned <code>/</code></h2></div>
+  <p class="step-note"><code>App.jsx</code>'s old inline <code>Home()</code> is gone; <code>/</code> now renders <code>LandingPage.jsx</code>. Logged out, it shows a one-sentence product pitch, a 3-item feature strip, a "Browse the public course" link straight to <code>/courses</code>, and one consolidated CTA block — Sign In as the visually primary action, Register secondary. The nav bar above it carries only the brand link; no Sign In/Register there anymore.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/13-landing-page-unauthenticated.png" alt="AhaSpace landing page, logged out: hero heading, product-intro subtext, three feature cards (Structured courses, Built-in AI tutor, Track your progress), Browse the public course link, Sign In primary button, Register secondary button"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Log out (or open in a private window), visit <code>http://localhost:3000/</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">09</span><h2>Course list — only the public course</h2></div>
+  <p class="step-note"><code>CourseList.jsx</code> fetches <code>coursesBase(isAuthenticated)</code>, which resolves to <code>/api/public/courses</code> when logged out. Heading and subtext ("Public courses" / "Sign in to see the full course catalog") make the demo scope explicit rather than looking like a bug or an empty catalog.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/14-courses-unauthenticated.png" alt="Courses page, logged out: heading Public courses, subtext Sign in to see the full course catalog, one course card: AI Engineering From Scratch"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From the landing page, click "Browse the public course" (or navigate to <code>/courses</code> directly).</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">10</span><h2>Course detail — title, description, source link, insights</h2></div>
+  <p class="step-note"><code>CoursePhases.jsx</code> fetches course metadata via <code>fetchCourseMeta()</code> (which hits <code>GET /api/public/courses/{id}</code> when logged out) in parallel with the phase list, under one loading state. The header block renders the course title as an <code>&lt;h1&gt;</code>, the description as prose, the source name as a link (<code>target="_blank" rel="noopener noreferrer"</code>) to <code>sourceUrl</code> with the MIT license line as small print beneath it, then the 3 insights as a bulleted list — all of it sourced straight from the <code>CourseDto</code> fields verified in the Endpoints section above, not hardcoded.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/15-course-detail-unauthenticated.png" alt="Course detail page, logged out: title AI Engineering From Scratch, description paragraph, source link AI Engineering from Scratch by rohitg00, MIT License small print, 3 bulleted insights, Phases heading, 3 phase cards below"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From the course list, click into "AI Engineering From Scratch".</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">11</span><h2>Phase → sections list</h2></div>
+  <p class="step-note"><code>PhaseSections.jsx</code>, same public/authenticated URL swap, unchanged rendering otherwise: 12 sections for "Phase 0: Setup &amp; Tooling", numbered by <code>orderIndex</code>.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/16-phase-sections-unauthenticated.png" alt="Sections page, logged out, Phase 0 Setup and Tooling: 12 numbered section cards, Dev Environment through Linux for AI"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From the course detail page, click into "Phase 0: Setup &amp; Tooling".</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">12</span><h2>Section content + chat panel — renders normally, logged out</h2></div>
+  <p class="step-note">This is the crux of the "visitor sees the chat feature exists" requirement: <code>SectionAssistantPanel</code> renders its full UI — heading, message list, input, Send button — for a logged-out visitor exactly as it would for a logged-in one. The only difference is invisible at this point: the <code>useEffect</code> that would call <code>loadSessions()</code> returns early when <code>!isAuthenticated</code>, and <code>ChatToolbar</code> (session history) is not rendered at all, since history is meaningless with no account to attach it to.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/17-section-chat-unauthenticated.png" alt="Section view page, logged out: Dev Environment lesson content on the left, Section Assistant chat panel on the right with message input and Send button, no chat history toolbar"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">From the sections list, click into "1. Dev Environment".</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">13</span><h2>Sending a message — zero network requests, sign-in modal instead</h2></div>
+  <p class="step-note">Typed a real message ("What is this section about?") into the input and clicked Send. <code>sendMessage</code>'s very first check is <code>if (!isAuthenticated)</code> — when true, it calls <code>setShowSignInPrompt(true)</code> and returns <strong>before</strong> the function ever reaches its <code>fetch(basePath, ...)</code> call. No optimistic user-message bubble is appended either; the typed text stays exactly as typed in the input, visible behind the modal below.</p>
+  <div class="dialog-note">
+    <span class="k">How "zero network requests" was actually verified</span>
+    A screenshot alone can't prove a request <em>didn't</em> happen, so this was checked programmatically: a Playwright <code>page.on("request", ...)</code> listener was attached before the click, and the full list of every request the page fired in the second after clicking Send was captured and filtered for anything containing <code>/chat</code>. The result was an empty list — <code>CHAT-RELATED REQUESTS: []</code> — captured from the real running page, not asserted from reading the source. To check this by hand instead: open browser devtools' <strong>Network</strong> tab, clear it, click Send, and confirm no new request appears — especially none to <code>.../sections/{id}/chat</code> or <code>.../chat/sessions</code>.
+  </div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/18-sign-in-prompt-modal.png" alt="Sign-in prompt modal open over the section view page: heading Sign in to continue, copy about signing in to chat with the AI, Sign In primary button, Register secondary button, the typed message still visible in the input behind the modal"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">
+      <ol>
+        <li>On the section view page (logged out), open devtools' Network tab and clear it.</li>
+        <li>Type any text into the message input and click Send.</li>
+        <li>Confirm: no new request appears in the Network tab, no user-message bubble appears in the chat panel, and a modal titled "Sign in to continue" opens with Sign In (primary) and Register (secondary) buttons.</li>
+      </ol>
+    </div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== AUTHENTICATED CONTRAST ============================== -->
+<details class="group" open>
+<summary class="group-label">Frontend — authenticated contrast</summary>
+<p class="group-intro">Same browser flow, same course, same section — this time logged in as a real registered account, to show exactly what changes and what stays identical. Registered via <code>POST /api/auth/register</code>, logged in through the real two-step <code>Login.jsx</code> form.</p>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">14</span><h2>Nav bar — AI Chat stays, Sign In/Register gone (because they're no longer needed)</h2></div>
+  <p class="step-note">Logged in, the nav bar shows AI Chat / Courses / Logout, same as before this week — <code>NavBar.jsx</code>'s authenticated branch is untouched. The landing page's authenticated branch is also untouched: a plain "Welcome back" greeting with the three action buttons.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/19-landing-nav-authenticated.png" alt="AhaSpace landing page, logged in as demo_tester@example.com: nav bar shows AI Chat, Courses, Logout; page shows Welcome back message and three action buttons"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">Register (<code>/register</code>) or log in (<code>/login</code>) with any account, land back on <code>/</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">15</span><h2>Course list, authenticated — sees every course, not just the public one</h2></div>
+  <p class="step-note"><code>CourseList.jsx</code> now hits <code>GET /api/courses</code> (the full, authenticated list) instead of the public endpoint. Both the public pilot course <em>and</em> the private draft course inserted in the Data Layer section appear here — proving the authenticated path genuinely sees more than the public one, not just a differently-labeled version of the same data.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/20-courses-authenticated.png" alt="Courses page, logged in: heading Courses, two course cards: AI Engineering From Scratch, and Private Draft Course (Not yet released)"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">While logged in, navigate to <code>/courses</code>.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">16</span><h2>Course detail, authenticated — identical rendering, different data source</h2></div>
+  <p class="step-note">Same course, same header block (title/description/source/insights), same phase list — <code>fetchCourseMeta()</code> just took the authenticated branch this time (<code>GET /api/courses</code> list, matched client-side by id) instead of the public one. Visually indistinguishable from the logged-out version in the section above, which is the point: the public and authenticated paths render identically, they just source data differently.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/21-course-detail-authenticated.png" alt="Course detail page, logged in: same title, description, source link, insights, and phase list as the unauthenticated version"></div>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">While logged in, click into "AI Engineering From Scratch" from the course list.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-num">17</span><h2>Chat panel, authenticated — history visible, message actually sends</h2></div>
+  <p class="step-note">Before sending anything, the one visible difference from the logged-out screenshot in step 12 appears: a <code>ChatToolbar</code> with "+ New Chat" and a "History" dropdown, because <code>isAuthenticated</code> is now true. Then the real test: typed a message and clicked Send. This time <code>sendMessage</code> runs its full path — <code>POST</code> to <code>/api/courses/{courseId}/phases/{phaseId}/sections/{sectionId}/chat</code> with a real <code>Bearer</code> token, a real call to Gemini (<code>gemini-2.5-flash-lite</code>, the same key already configured in <code>application-dev.yaml</code>), and a real reply rendered in the message list with a model tag and timestamp.</p>
+  <div class="shot-wrap"><img class="shot" src="screenshots/22-section-chat-authenticated-before-send.png" alt="Section view page, logged in, before sending: chat panel shows + New Chat and History buttons, empty message list, message input"></div>
+  <div class="shot-wrap" style="margin-top:14px;"><img class="shot" src="screenshots/23-section-chat-authenticated-message-sent.png" alt="Section view page, logged in, after sending: user message bubble 'In one sentence, what is this section about?', AI reply bubble tagged gemini-2.5-flash-lite with a real answer about the dev environment section, History (1) now showing one saved session"></div>
+  <p class="step-note" style="margin-top:14px;">"History (1)" in the toolbar after the send is the session actually persisting server-side — this is the same <code>SectionChatController</code>/<code>GeminiProvider</code> path Week 17 shipped, completely untouched by this week's change, exercised end to end for real.</p>
+  <details class="recreate">
+    <summary>Recreate this step</summary>
+    <div class="body">While logged in, open the same section as step 12, type a message, click Send. Expect a real AI reply within a few seconds (requires a valid <code>gemini.api.key</code> in <code>application-dev.yaml</code> — already configured in this repo's checked-in dev config).</div>
+  </details>
+</section>
+
+</details>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<details class="group" open>
+<summary class="group-label">Troubleshooting</summary>
+<p class="group-intro">Week 17's testing guide was never actually committed to this branch — it exists only in a git stash on <code>main</code> — so there is nothing to check <code>docs/testing/week-17/</code> for or carry forward from it. Everything below is specific to what actually came up while building this week's guide.</p>
+
+<section class="step">
+  <div class="step-head"><h2>Seed run does nothing / <code>/api/public/courses</code> returns <code>[]</code></h2></div>
+  <p class="step-note">Two independent causes produce the same symptom. First: the <code>seed</code> profile was not included alongside <code>dev</code> — <code>CurriculumSeedRunner</code> is <code>@Profile("seed")</code> and simply doesn't exist as a bean otherwise, no error, no log line, nothing. Second: <code>curriculum.source-path</code> was not passed — without a default anywhere in the YAML config, Spring fails placeholder resolution for the <code>@Value</code> field at startup, which surfaces as a bean-creation error mentioning <code>curriculum.source-path</code> could not be resolved.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">Confirm the startup log's profile line reads <code>The following 2 profiles are active: "dev", "seed"</code> (not just <code>"dev"</code>), and that <code>-Dspring-boot.run.arguments=--curriculum.source-path=...</code> points at a real checkout of <code>ai-engineering-from-scratch</code> with a <code>phases/</code> directory inside it.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Postgres role/database don't exist yet on a fresh install</h2></div>
+  <p class="step-note">Hit this directly while building this guide: Docker Desktop's daemon wasn't running, so Postgres was started via a native Homebrew install instead of this project's <code>docker-compose.yml</code> — which meant the <code>ahaspace</code> role and <code>enlightenment</code> database the compose file would normally create automatically didn't exist. Connecting with <code>psql -U ahaspace -d enlightenment</code> failed with <code>FATAL: role "ahaspace" does not exist</code>.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body"><pre>psql -h localhost -p 5432 -d postgres -c "CREATE ROLE ahaspace WITH LOGIN PASSWORD 'ahaspace';"
+psql -h localhost -p 5432 -d postgres -c "CREATE DATABASE enlightenment OWNER ahaspace;"</pre>
+    Using <code>docker compose up -d</code> from a running Docker daemon avoids this entirely — the Postgres image's <code>POSTGRES_DB</code>/<code>POSTGRES_USER</code>/<code>POSTGRES_PASSWORD</code> env vars in <code>docker-compose.yml</code> create both automatically on first start.</div>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head"><h2>Confusing a private course's 404 for a bug</h2></div>
+  <p class="step-note">Not a bug: this is the exact, deliberate behavior <code>decisions.md</code> calls for. <code>GET /api/public/courses/2</code> (the private draft course) and <code>GET /api/public/courses/999</code> (an id that doesn't exist at all) return byte-identical 404 bodies. There is no way, from the public API alone, to tell "this course exists but is private" apart from "this course doesn't exist" — that's the entire point of guarding every public method on <code>findByIdAndIsPublicTrue</code> rather than checking existence and visibility separately.</p>
+  <details class="recreate">
+    <summary>Fix applied</summary>
+    <div class="body">Not applicable — this is expected behavior, verified in the Endpoints section above.</div>
+  </details>
+</section>
+
+</details>
+
+</div>
+
+<script>
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn) {
+    var original = 'Copy';
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+
+  document.querySelectorAll('.page pre').forEach(function (pre) {
+    if (pre.closest('.term')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = pre.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showCopied(btn);
+        }).catch(function () {
+          fallbackCopy(text);
+          showCopied(btn);
+        });
+      } else {
+        fallbackCopy(text);
+        showCopied(btn);
+      }
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
